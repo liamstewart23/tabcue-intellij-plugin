@@ -20,9 +20,16 @@ repositories {
 
 dependencies {
     intellijPlatform {
-        // Compiled against the 253 baseline, which is also the `since-build` floor. Targeting the
-        // newer 262 would make the platform plugin infer a JVM 25 bytecode target, which the
-        // Kotlin compiler cannot emit. verifyPlugin below checks both branches instead.
+        // Compiled against the 253 baseline, which is also the `since-build` floor. The point is
+        // the compile-time guarantee: the compiler rejects any API missing from the oldest IDE we
+        // claim to support, which the Plugin Verifier can only check after the fact, and only for
+        // the IDEs listed below.
+        //
+        // Building against 2026.2 was tried and does work — 262 ships Java 25 bytecode and Kotlin
+        // metadata 2.4, so it needs Kotlin 2.4.20, a JDK 25 toolchain, and a task-level
+        // `jvmTarget = 21` override to stop the platform plugin inferring 25. That verified 5/5.
+        // It was rejected anyway: the override is load-bearing, and if it ever stops applying the
+        // build silently emits Java 25 bytecode that no 2025.3 user can load.
         phpstorm("2025.3.6.1")
 
         // Supplies both org.jetbrains.plugins.terminal.* and the reworked
@@ -40,13 +47,10 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
-// Java 21 is set explicitly rather than via `jvmToolchain(21)`. The only JDK on this machine is
-// PhpStorm's bundled JBR, which `org.gradle.java.home` already selects as the build JVM; asking
-// for a *toolchain* additionally requires Gradle's auto-detection to find a JDK 21 on disk, and it
-// does not look inside .app bundles — so a fresh daemon failed to configure at all.
 kotlin {
-    // Provisioned by Gradle rather than taken from whatever JDK happens to be installed, so an
-    // IDE runtime upgrade cannot change what this build produces.
+    // Provisioned by Gradle via the foojay resolver in settings.gradle.kts rather than taken from
+    // whatever JDK happens to be installed, so an IDE runtime upgrade cannot change what this
+    // build produces. 21 is what platform branch 253 runs on.
     jvmToolchain(21)
     compilerOptions {
         // Pinned to what branch 253 bundles. Left unpinned, the compiler can emit metadata newer
