@@ -42,8 +42,8 @@ data class StyleRule(
  * Glob matching (`*` and `?`), case-insensitive, implicitly substring.
  *
  * Matched with a two-pointer scan rather than a compiled regex. Translating `*` to `.*` produces
- * the classic catastrophic-backtracking shape — `*a*a*a*a*a*a` against a long non-matching string
- * blows up exponentially — and this runs on the EDT against a shell-reported title, which a remote
+ * the classic catastrophic-backtracking shape, where `*a*a*a*a*a*a` against a long non-matching
+ * string blows up exponentially. This runs on the EDT against a shell-reported title, which a remote
  * host can influence. The scan below has no such cliff, and it needs no pattern cache.
  */
 object RuleMatcher {

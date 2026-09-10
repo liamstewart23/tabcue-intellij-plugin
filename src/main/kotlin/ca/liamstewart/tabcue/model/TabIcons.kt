@@ -20,7 +20,7 @@ import javax.swing.UIManager
  * an icon is the only per-tab cue that holds in every state.
  */
 
-/** A filled circle in the tab's colour — the colour cue that survives selection and hover. */
+/** A filled circle in the tab's colour, the cue that survives selection and hover. */
 class DotIcon(private val color: java.awt.Color, private val size: Int = 10) : Icon {
 
     override fun getIconWidth(): Int = JBUIScale.scale(size)
@@ -55,7 +55,7 @@ class EmojiIcon(text: String, private val size: Int = 14) : Icon {
      * Trimmed to a single grapheme cluster.
      *
      * `paintIcon` draws with `drawString`, and Swing clips to the enclosing *label*, not to the
-     * icon's declared bounds — so pasting a long string into the emoji field would paint straight
+     * icon's declared bounds, so pasting a long string into the emoji field would paint straight
      * across the tab title and into the neighbouring tabs. One cluster, not one `char`, so a
      * flag or a ZWJ sequence survives intact.
      */
@@ -115,7 +115,7 @@ class EmojiIcon(text: String, private val size: Int = 14) : Icon {
  *
  * Applied on the way *in* as well as at paint time. [EmojiIcon] has always drawn only the first
  * cluster, so without this the settings file could hold a whole pasted paragraph while the tab
- * showed one character — an unbounded string persisted per tab, and a stored value that did not
+ * showed one character: an unbounded string persisted per tab, and a stored value that did not
  * match what the user could see. One cluster rather than one `char`, so a flag or a ZWJ sequence
  * survives intact.
  */

@@ -17,18 +17,15 @@ import java.lang.reflect.Proxy
 /**
  * The single choke point for every call into the reworked ("Gen2") terminal API.
  *
- * Why this file is entirely reflective: `com.intellij.terminal.frontend.toolwindow.*` is annotated
- * `@ApiStatus.Experimental` *and* `@ApiStatus.NonExtendable` on 253, and has already drifted —
- * `TerminalToolWindowTabsManagerKt.findTabByContent(manager, content)` exists on 253 but was
- * removed in 262 in favour of the extension `Content.getTerminalTab()`. A static reference would
- * mean two problems: Plugin Verifier flags it (its scan is static, so `try`/`catch NoSuchMethodError`
- * does not help), and a future rename turns into a `NoClassDefFoundError` that breaks the whole
- * plugin rather than one feature.
+ * Entirely reflective, because `com.intellij.terminal.frontend.toolwindow.*` is `@Experimental`
+ * and has already drifted: `findTabByContent` existed on 253 and was replaced in 262 by the
+ * extension `Content.getTerminalTab()`. A static reference would both trip the Plugin Verifier
+ * (its scan is static, so catching `NoSuchMethodError` does not help) and turn a future rename
+ * into a `NoClassDefFoundError` that breaks the whole plugin rather than one feature.
  *
- * So: no compile-time dependency on the experimental API at all. Every lookup is cached, every
- * failure degrades to `null`/`false`, and the caller falls back to the engine-agnostic
- * `Content`-only path. [TerminalTitle] and [com.intellij.terminal.ui.TerminalWidget] are the
- * exception — those live in the platform, are unannotated, and are safe to bind directly.
+ * Every lookup is cached and every failure degrades to null, leaving the caller on the
+ * engine-agnostic `Content` path. [TerminalTitle] and `TerminalWidget` are bound directly, being
+ * unannotated platform API.
  */
 object TerminalTabFacade {
 
@@ -84,8 +81,8 @@ object TerminalTabFacade {
                     }
                     // These must answer for the *proxy*, not for this object. Answering for the
                     // handler made `proxy.equals(proxy)` false and gave every proxy the same
-                    // hashCode, so any equality-based removal — a HashSet, List.remove, a
-                    // Disposer hook — silently failed to unregister the listener. That pins the
+                    // hashCode, so any equality-based removal (a HashSet, List.remove, a
+                    // Disposer hook) silently failed to unregister the listener. That pins the
                     // plugin classloader and the IDE reports "plugin was not unloaded".
                     "equals" -> proxy === args?.firstOrNull()
                     "hashCode" -> System.identityHashCode(proxy)
@@ -126,7 +123,7 @@ object TerminalTabFacade {
      * A [java.lang.reflect.Method] cache keyed by class and name.
      *
      * `Class.getMethod` copies the class's declared-method array on every call, and these are hit
-     * several times per terminal title change — which for a shell reporting its title per prompt is
+     * several times per terminal title change, which for a shell reporting its title per prompt is
      * many times a minute.
      */
     private val instanceMethods =
@@ -220,7 +217,7 @@ object TerminalTabFacade {
      *
      * The reworked terminal draws into `EditorImpl` instances, but `TerminalView` does not expose
      * them, so we walk the Swing tree instead of casting to the internal `TerminalViewImpl`.
-     * Traversal is the more durable of the two options — it survives class renames — but it is
+     * Traversal is the more durable of the two options, surviving class renames, but it is
      * still unsupported, hence the tint being opt-in and best-effort. Must run on the EDT.
      *
      * A split tab yields more than one editor; all of them get tinted.

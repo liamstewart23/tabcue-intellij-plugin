@@ -55,7 +55,7 @@ class TabStyleService(val project: Project) : Disposable {
      *
      * Used instead of the tool window's own content list when comparing a tab against its
      * siblings. The terminal can move a session out to an editor ("Move to Editor"), and such a
-     * tab is in no tool window content manager at all — so it would be invisible to the identity
+     * tab is in no tool window content manager at all, so it would be invisible to the identity
      * discriminator and to auto-colour assignment, and invisible to its siblings, letting keys
      * collide and colours duplicate.
      */
@@ -69,7 +69,7 @@ class TabStyleService(val project: Project) : Disposable {
         tabDisposables.keys.toList().forEach { forget(it) }
         knownContents.clear()
         // The plugin is dynamically loadable, so disabling or uninstalling it must not leave
-        // coloured tabs behind until the next restart — and while our icons and user data are still
+        // coloured tabs behind until the next restart, while our icons and user data are still
         // attached to live Contents, the plugin classloader cannot be collected either, which the
         // platform reports as "plugin was not unloaded, restart required".
         if (ApplicationManager.getApplication().isDispatchThread) {
@@ -77,7 +77,7 @@ class TabStyleService(val project: Project) : Disposable {
                 allKnownTabs().forEach { content ->
                     TabStyleApplier.reset(content)
                     // The applier clears its own keys; these are ours. A non-null value here keeps
-                    // the Key instance — a plugin-loaded class — reachable from the Content.
+                    // the Key instance, a plugin-loaded class, reachable from the Content.
                     content.putUserData(STYLE_KEY, null)
                     content.putUserData(AUTO_COLOR, null)
                     content.putUserData(KEY_INDEX, null)
@@ -97,7 +97,7 @@ class TabStyleService(val project: Project) : Disposable {
         // A theme switch changes the terminal background the tint is derived from, and nothing else
         // would trigger a restyle until the next title change.
         // Only the editor-colors topic: a theme switch fires both this and LafManagerListener, and
-        // subscribing to both ran two full restyle passes — including the Swing walk for tints —
+        // subscribing to both ran two full restyle passes, including the Swing walk for tints,
         // for one user action. The tint is derived from the colors scheme, so this is the one that
         // matters.
         ApplicationManager.getApplication().messageBus.connect(this).subscribe(
@@ -153,7 +153,7 @@ class TabStyleService(val project: Project) : Disposable {
             watchedManagers.remove(contentManager)
         }
 
-        // Style anything already open — reopening a project restores tabs before we get here.
+        // Style anything already open, since reopening a project restores tabs before we get here.
         contentManager.contents.forEach { content -> onEdt { onTabAppeared(content) } }
     }
 
@@ -182,7 +182,7 @@ class TabStyleService(val project: Project) : Disposable {
      * resolvable yet.
      *
      * Gen2 builds `TerminalView` asynchronously. Retrying on immediate `invokeLater` ticks would
-     * drain the whole budget inside one event-queue burst — a fraction of a millisecond — so a tab
+     * drain the whole budget inside one event-queue burst, a fraction of a millisecond, so a tab
      * that is a little slow would end up with no listener for the rest of the session, meaning
      * working-directory rules would never apply to it.
      */
@@ -269,7 +269,7 @@ class TabStyleService(val project: Project) : Disposable {
      * Every tab we should act on: the tool window's own plus anything we have styled.
      *
      * Bulk operations must use this rather than [terminalContents]. A tab in a second (undocked)
-     * content manager, or one detached to an editor, is absent from the primary manager — so a
+     * content manager, or one detached to an editor, is absent from the primary manager, so a
      * theme change would leave it tinted from the old theme, a settings change would not reach it,
      * and disposal would leave it styled after the plugin unloaded.
      */
@@ -300,24 +300,17 @@ class TabStyleService(val project: Project) : Disposable {
     /**
      * The identity used to persist a manual override.
      *
-     * **Pure** — it deliberately does not pin anything. It is called from action `update()` while
-     * the context menu is being built, and pinning there would freeze the tab's identity at
-     * whatever directory the shell happened to be in when the menu was opened. Only
-     * [setManualStyle] pins.
+     * Pure: it does not pin anything, because action `update()` calls it while the context menu is
+     * being built and pinning there would freeze the tab's identity at whatever directory the
+     * shell was in at that moment. Only [setManualStyle] pins.
      *
-     * Preference order: a user-defined title is the most stable identity available, since the user
-     * chose it and nothing else rewrites it. Otherwise the working directory, which reads naturally
-     * — the terminal you open in a project keeps its colour — but is *not* unique, so it carries a
-     * discriminator to stop two terminals in the same directory sharing one override.
-     */
-    /**
-     * The pinned key is checked *before* resolving tab info, not after.
+     * A user-defined title is preferred, being the most stable identity available. Otherwise the
+     * working directory, which is not unique, so it carries a discriminator to stop two terminals
+     * in one directory sharing an override.
      *
-     * The private overload short-circuits on `STYLE_KEY` too, but as an argument
-     * `TerminalTabFacade.describe` was evaluated eagerly and then discarded — a reflective tab
-     * lookup plus a shell working-directory query, run once per context-menu item, for a tab whose
-     * key was already known. Any tab the user has styled by hand has that key pinned, so the common
-     * case is now free.
+     * The pinned key is checked before resolving tab info rather than after, so a hand-styled tab
+     * costs nothing: passing `describe` as an argument evaluated a reflective lookup and a shell
+     * directory query once per menu item and then discarded them.
      */
     fun styleKeyFor(content: Content): String =
         content.getUserData(STYLE_KEY)
@@ -346,7 +339,7 @@ class TabStyleService(val project: Project) : Disposable {
     /**
      * The lowest index not already pinned by another live tab sharing this prefix.
      *
-     * Two terminals opened in the project root — the default — would otherwise both resolve to
+     * Two terminals opened in the project root, which is the default, would otherwise resolve to
      * `cwd:/path`, so styling one would silently style the other and the context menu's
      * checkmarks would describe the wrong tab.
      */
@@ -389,21 +382,13 @@ class TabStyleService(val project: Project) : Disposable {
     /**
      * Picks a palette colour for a tab that has no style of its own.
      *
-     * Derived from the tab's own identity — [key] is its title and working directory — rather than
-     * handed out in the order tabs happen to open. That is what makes the colour a property of the
-     * *tab* instead of the session: the same tab comes back the same colour after a restart, and
-     * on a colleague's machine, because `String.hashCode` is specified by the JDK rather than
-     * being an implementation detail. Handing out "first unused" instead meant reopening a project
-     * and finding every terminal a different colour than yesterday, which trains you to ignore the
-     * colours entirely.
+     * Derived from [key], the tab's title and working directory, rather than handed out in the
+     * order tabs open. That makes the colour a property of the tab, so it survives a restart:
+     * `String.hashCode` is JDK-specified, not an implementation detail. Distinctness still wins,
+     * since the hash only picks where to start looking and a sibling's colour is skipped.
      *
-     * Distinctness still wins where the two conflict: the hash only chooses where to *start*, and
-     * a colour already on a sibling is skipped. Two tabs therefore never collide just because
-     * their names happened to hash together, and with fewer tabs than colours the walk almost
-     * never moves.
-     *
-     * Pinned per tab on first use, because this is re-resolved on every terminal title change and
-     * the sibling set changes as tabs come and go.
+     * Pinned on first use, because this is re-resolved on every title change and the sibling set
+     * changes as tabs come and go.
      */
     private fun autoColorFor(content: Content, key: String): String {
         content.getUserData(AUTO_COLOR)?.let { return it }
@@ -432,8 +417,8 @@ class TabStyleService(val project: Project) : Disposable {
     fun setManualStyle(content: Content, transform: (TabStyle) -> TabStyle) {
         if (isTornDown(content)) return
         val key = styleKeyFor(content)
-        // The user chose this deliberately, so lock the identity here — the one place it is right
-        // to do so — even if it is the weak fallback.
+        // The user chose this deliberately, so lock the identity here, the one place it is right
+        // to do so, even if it is the weak fallback.
         content.putUserData(STYLE_KEY, key)
 
         // Based on the override alone, never on what a rule happens to be painting: starting from
@@ -483,19 +468,16 @@ class TabStyleService(val project: Project) : Disposable {
     /**
      * Whether the tab has already been torn down.
      *
-     * Mutating a disposed [Content] is not merely wasted work: once the session is gone
-     * `styleKeyFor` falls back to the weak `tab:<label>` identity, so the write persists an
-     * override under a key shared with every other unresolved tab, and a later tab can inherit it.
-     * Reachable because the colour picker commits continuously while it is open, and because a
-     * context menu outlives the click that opened it.
+     * Writing to a disposed [Content] is worse than wasted work: `styleKeyFor` has fallen back to
+     * the weak `tab:<label>` identity by then, so the override persists under a key shared with
+     * every other unresolved tab and a later tab can inherit it. Reachable because the colour
+     * picker commits continuously and a context menu outlives the click that opened it.
      *
-     * Deliberately *not* [isGone], which asks whether the content has left every content manager —
-     * a different question that is also true of a live but unattached tab, and using it here turned
-     * every style mutation into a silent no-op.
+     * Not [isGone], which asks whether the content has left every manager. That is also true of a
+     * live but unattached tab, and using it here turned every style mutation into a no-op.
      *
-     * `Disposer.isDisposed` is deprecated in favour of explicit lifecycle tracking, but it is the
-     * only accurate answer available for a `Content` we did not create: the disposal tree is where
-     * that state actually lives.
+     * `Disposer.isDisposed` is deprecated, but the disposal tree is where this state actually
+     * lives for a `Content` we did not create.
      */
     @Suppress("DEPRECATION")
     private fun isTornDown(content: Content): Boolean = Disposer.isDisposed(content)

@@ -74,10 +74,10 @@ object TabStyleApplier {
      */
     private val PRE_TINT_BACKGROUND = Key.create<Color>("TabCue.preTintBackground")
 
-    /** Failed tint attempts, so a tab whose editor never appears stops retrying every prompt. */
-    private val TINT_ATTEMPTS = Key.create<Int>("TabCue.tintAttempts")
+    /** Failed attempts, so a tab whose editor or label never appears stops retrying every prompt. */
+    private val SETTLE_ATTEMPTS = Key.create<Int>("TabCue.settleAttempts")
 
-    private const val MAX_TINT_ATTEMPTS = 8
+    private const val MAX_SETTLE_ATTEMPTS = 8
 
     fun appliedStyle(content: Content): TabStyle? = content.getUserData(APPLIED)?.style
 
@@ -88,16 +88,20 @@ object TabStyleApplier {
         colorAsDot: Boolean,
         tintStrength: Int,
     ) {
-        val wantTintNow = tintEnabled && style.tintBackground
-        val editors = if (wantTintNow || content.getUserData(TINTED) == true) {
+        // Ahead of the memo, because the platform resets the label colour behind our back:
+        // BaseLabel.updateUI does it on any LaF change, and a rebuilt tool window makes a fresh
+        // label. Neither invalidates the memo. Cheap enough to repeat: the label is cached, and
+        // nothing is written unless the colour actually differs.
+        val textSettled = applyTextColor(content, style)
+
+        val wantTint = tintEnabled && style.tintBackground
+        val editors = if (wantTint || content.getUserData(TINTED) == true) {
             TerminalTabFacade.outputEditors(content)
         } else {
             emptyList()
         }
         val target = Applied(style, colorAsDot, tintEnabled, editors.size, tintStrength)
-        if (content.getUserData(APPLIED) == target) return
-
-        val wantTint = tintEnabled && style.tintBackground
+        if (content.getUserData(APPLIED) == target && textSettled) return
 
         // Not the accent itself: ColorMath derives a fill that keeps the tab label legible and
         // pre-compensates for the translucent overlay the platform composites over it. Null still
@@ -109,17 +113,10 @@ object TabStyleApplier {
         runCatching { applyIcon(content, style, colorAsDot) }
             .onFailure { LOG.warn("Could not set tab icon", it) }
 
-        // Deliberately last and deliberately swallowed: this is the one unsupported channel, and a
-        // failure here must not cost the user their colour and icon.
-        // Entered when a tint is wanted *or* when one is already applied and must come off. The
-        // second half matters: skipping this whole block whenever `tintEnabled` was false left the
-        // kill switch unable to actually remove an existing tint, so clearing the setting appeared
-        // to do nothing until the IDE restarted.
-        // The label is a sibling of the tab content and does not exist until the tool window has
-        // been shown once, so this can legitimately fail on the first attempt — same shape as the
-        // tint, and bounded by the same attempt cap below.
-        val textSettled = applyTextColor(content, style)
-
+        // Last, and swallowed: the tint is the one unsupported channel, and a failure here must not
+        // cost the user their colour and icon. Entered when a tint is wanted or when one is
+        // already applied and has to come off, so that switching the setting off can actually
+        // remove it.
         val tintSettled = if (wantTint || content.getUserData(TINTED) == true) {
             guarded(LOG, "Background tint unavailable for this tab") {
                 applyBackgroundTint(content, wantTint, style, editors, tintStrength)
@@ -133,15 +130,14 @@ object TabStyleApplier {
         // every later retry, leaving the tint permanently unapplied.
         if (tintSettled && textSettled) {
             content.putUserData(APPLIED, target)
-            content.putUserData(TINT_ATTEMPTS, null)
+            content.putUserData(SETTLE_ATTEMPTS, null)
         } else {
-            // Bounded. Not memoising a failed tint is what allows a retry, but with no limit a tab
-            // whose editor is never found would walk its whole Swing subtree and write a log line
-            // on every shell prompt, forever.
-            val attempts = (content.getUserData(TINT_ATTEMPTS) ?: 0) + 1
-            content.putUserData(TINT_ATTEMPTS, attempts)
-            if (attempts >= MAX_TINT_ATTEMPTS) {
-                LOG.info("Giving up on the background tint for a tab after $attempts attempts")
+            // Not memoising is what allows a retry, but with no limit a tab whose editor never
+            // appears would search on every shell prompt forever.
+            val attempts = (content.getUserData(SETTLE_ATTEMPTS) ?: 0) + 1
+            content.putUserData(SETTLE_ATTEMPTS, attempts)
+            if (attempts >= MAX_SETTLE_ATTEMPTS) {
+                LOG.info("Gave up applying the tint or label colour after $attempts attempts")
                 content.putUserData(APPLIED, target)
             }
         }
@@ -152,7 +148,7 @@ object TabStyleApplier {
      *
      * The `TEXT_COLORED` marker is what makes clearing work: once the theme default has been
      * overwritten there is no way to ask the label what it used to be, so the only way back is to
-     * reassign `JBColor.foreground()` — and we must know to do that even though the new style has
+     * reassign `JBColor.foreground()`, and we must know to do that even though the new style has
      * no colour of its own.
      */
     private fun applyTextColor(content: Content, style: TabStyle): Boolean {
@@ -171,8 +167,8 @@ object TabStyleApplier {
      * Sets the tab icon, without destroying an icon somebody else owns.
      *
      * PhpStorm 2026.2 made this matter. Its "AI Agents" terminal feature sets an agent logo with
-     * *exactly* the two calls used here — `putUserData(SHOW_CONTENT_ICON, true)` and
-     * `content.icon = agent.icon` — on tabs it launches (Codex and Junie today; Claude Code
+     * exactly the two calls used here, `putUserData(SHOW_CONTENT_ICON, true)` and
+     * `content.icon = agent.icon`, on tabs it launches (Codex and Junie today; Claude Code
      * declares `showIconInTab = false`). Since this runs on every terminal tab, styled or not, an
      * unconditional `content.icon = null` silently wiped that logo the first time we touched the
      * tab. So: only ever clear an icon we set, and put back whatever was there before we did.
@@ -204,7 +200,7 @@ object TabStyleApplier {
         // handles the PROP_ICON change, and writing user data fires no event of its own. Setting
         // the icon *last* is therefore what makes it appear immediately; with the icon set first
         // the label would refresh before the flags were true and only pick the icon up on the next
-        // unrelated tab update — which is why it previously took a click on the tab to show up.
+        // unrelated tab update, which is why it previously took a click on the tab to show up.
         content.putUserData(ToolWindow.SHOW_CONTENT_ICON, true)
         // Without this, unselected tabs render the icon at 50% alpha as a WatermarkIcon.
         content.putUserData(ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT, false)
@@ -266,11 +262,17 @@ object TabStyleApplier {
         )
         content.putUserData(APPLIED, null)
         content.putUserData(TINTED, null)
-        content.putUserData(TINT_ATTEMPTS, null)
+        content.putUserData(SETTLE_ATTEMPTS, null)
+        content.putUserData(TEXT_COLORED, null)
+        content.putUserData(ICON_OWNED, null)
+        content.putUserData(FOREIGN_ICON, null)
+        TabLabelFacade.forget(content)
     }
 
     /** Forces the next [apply] to do real work, e.g. after a theme change. */
     fun invalidate(content: Content) {
         content.putUserData(APPLIED, null)
+        // A theme change also recreates label colours, so the cached label is worth re-finding.
+        TabLabelFacade.forget(content)
     }
 }

@@ -48,6 +48,18 @@ internal class RuleEditorDialog(
      * uses. Only meaningful while "Custom…" is selected, so it follows the combo's enablement.
      */
     private val customColor = ColorPanel().apply { isEnabled = false }
+    private val textColorCombo = ComboBox(
+        DefaultComboBoxModel(
+            (
+                listOf(Choice(null, "Default")) +
+                    StylePalette.textColors.map { Choice(it.id, it.displayName) } +
+                    Choice(CUSTOM_CHOICE_ID, "Custom…")
+                )
+                .toTypedArray()
+        )
+    )
+
+    private val customTextColor = ColorPanel().apply { isEnabled = false }
     private val iconCombo = ComboBox(
         DefaultComboBoxModel(
             (listOf(Choice(null, "None")) + StylePalette.icons.map { Choice(it.id, it.displayName) })
@@ -71,6 +83,12 @@ internal class RuleEditorDialog(
             } else {
                 colorCombo.selectItem(rule.style.colorId)
             }
+            if (ColorMath.isCustom(rule.style.textColorId)) {
+                textColorCombo.selectItem(CUSTOM_CHOICE_ID)
+                customTextColor.selectedColor = ColorMath.parseCustom(rule.style.textColorId)
+            } else {
+                textColorCombo.selectItem(rule.style.textColorId)
+            }
             iconCombo.selectItem(rule.style.iconId)
             emojiField.text = rule.style.emoji.orEmpty()
             tintCheck.isSelected = rule.style.tintBackground
@@ -84,6 +102,9 @@ internal class RuleEditorDialog(
 
         colorCombo.addItemListener { updateCustomColorEnabled() }
         updateCustomColorEnabled()
+
+        textColorCombo.addItemListener { updateCustomTextColorEnabled() }
+        updateCustomTextColorEnabled()
     }
 
     private fun updateCustomColorEnabled() {
@@ -93,6 +114,14 @@ internal class RuleEditorDialog(
         // unset ColorPanel would make the rule silently style nothing.
         if (custom && customColor.selectedColor == null) {
             customColor.selectedColor = StylePalette.colors.first().color
+        }
+    }
+
+    private fun updateCustomTextColorEnabled() {
+        val custom = (textColorCombo.selectedItem as? Choice)?.id == CUSTOM_CHOICE_ID
+        customTextColor.isEnabled = custom
+        if (custom && customTextColor.selectedColor == null) {
+            customTextColor.selectedColor = StylePalette.textColors.first().color
         }
     }
 
@@ -116,12 +145,17 @@ internal class RuleEditorDialog(
         row("") {
             comment(
                 "Case-insensitive, matched as a substring. <code>*</code> and <code>?</code> " +
-                    "are wildcards &mdash; e.g. <code>ssh prod*</code> or <code>*/api/*</code>."
+                    "are wildcards, so <code>ssh prod*</code> or <code>*/api/*</code> both work."
             )
         }
         row("Color:") {
             cell(colorCombo)
             cell(customColor)
+        }
+        row("Text color:") {
+            cell(textColorCombo)
+            cell(customTextColor)
+            comment("The only cue that stays visible while the tab is selected.")
         }
         row("Icon:") { cell(iconCombo) }
         row("Emoji:") {
@@ -147,7 +181,8 @@ internal class RuleEditorDialog(
         if (toRule().style.isEmpty) {
             // Otherwise the rule silently matches and then does nothing, which reads as a bug.
             return ValidationInfo(
-                "Choose a color, an icon or an emoji, otherwise this rule has no effect.",
+                "Choose a color, a text color, an icon or an emoji, otherwise this rule has " +
+                    "no effect.",
                 colorCombo,
             )
         }
@@ -167,6 +202,12 @@ internal class RuleEditorDialog(
         return customColor.selectedColor?.let { ColorMath.toColorId(it) }
     }
 
+    private fun selectedTextColorId(): String? {
+        val choice = (textColorCombo.selectedItem as? Choice)?.id ?: return null
+        if (choice != CUSTOM_CHOICE_ID) return choice
+        return customTextColor.selectedColor?.let { ColorMath.toColorId(it) }
+    }
+
     fun toRule(): StyleRule = StyleRule(
         field = fieldCombo.selectedItem as? MatchField ?: MatchField.TAB_TITLE,
         pattern = patternField.text?.trim().orEmpty(),
@@ -175,6 +216,7 @@ internal class RuleEditorDialog(
             iconId = (iconCombo.selectedItem as? Choice)?.id,
             tintBackground = tintCheck.isSelected,
             emoji = normaliseEmoji(emojiField.text),
+            textColorId = selectedTextColorId(),
         ),
         enabled = enabledCheck.isSelected,
     )

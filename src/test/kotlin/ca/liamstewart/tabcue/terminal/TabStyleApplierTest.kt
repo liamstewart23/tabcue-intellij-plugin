@@ -229,4 +229,20 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         assertNull(content.getUserData(ToolWindow.SHOW_CONTENT_ICON))
         assertNull(content.getUserData(ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT))
     }
+
+    fun testResetLeavesNoMarkersBehind() {
+        // reset runs on plugin unload, where a leftover marker is not merely untidy: a stale
+        // "we own this icon" would make the next load clear an icon it never set.
+        val content = newContent()
+        val foreign = com.intellij.icons.AllIcons.General.Information
+        content.icon = foreign
+
+        applyStyle(content, TabStyle(colorId = "red", emoji = "\uD83D\uDE80", textColorId = "white"))
+        TabStyleApplier.reset(content)
+
+        assertNull("tab colour should be gone", content.tabColor)
+        assertNull("applied style should be forgotten", TabStyleApplier.appliedStyle(content))
+        // The foreign icon is restored by the reset's own apply pass, then ownership is dropped.
+        assertSame("the icon we replaced should be back", foreign, content.icon)
+    }
 }

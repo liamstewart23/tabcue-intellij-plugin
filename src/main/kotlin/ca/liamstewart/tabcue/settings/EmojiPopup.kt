@@ -105,7 +105,7 @@ internal object EmojiPopup {
 
         // Shown on the next EDT pass rather than immediately. This action runs while the context
         // menu is still dismissing, and the very mouse event that closes the menu is then
-        // delivered outside the new popup — which, with setCancelOnClickOutside, closed it again
+        // delivered outside the new popup, which with setCancelOnClickOutside closed it again
         // the instant it opened. The symptom is a popup that never appears at all.
         ApplicationManager.getApplication().invokeLater(
             { if (!popup.isDisposed) popup.show(point) },

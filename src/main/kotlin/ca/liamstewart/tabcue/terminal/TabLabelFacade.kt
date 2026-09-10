@@ -1,133 +1,135 @@
 package ca.liamstewart.tabcue.terminal
 
-import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.util.Key
 import com.intellij.ui.JBColor
 import com.intellij.ui.content.Content
 import ca.liamstewart.tabcue.util.quietly
 import java.awt.Color
 import java.awt.Component
 import java.awt.Container
+import java.lang.ref.WeakReference
 import javax.swing.SwingUtilities
 
 /**
- * Sets the *text* colour of a single tool-window tab label.
+ * Sets the text colour of a single tool-window tab label.
  *
- * `Content` has no foreground API — that is why the tab fill is derived rather than used raw, so
- * the theme's own label colour always stays legible. This is the deliberate escape hatch from that
- * design, for the one case derivation cannot reach: the platform discards a tab's colour entirely
- * while that tab is selected, so the label is the only thing left to colour.
+ * `Content` has no foreground API, so this reaches the label itself.
+ * `BaseLabel.setActiveFg`/`setPassiveFg` are public, and `paintComponent` reads the fields they
+ * write rather than the `getActiveFg`/`getPassiveFg` getters that `ContentTabLabel` overrides with
+ * theme colours, so painting honours what we set. Same in the 253 and 262 bytecode.
  *
- * ## Why this works, and why it is reflective
- *
- * The label is `com.intellij.openapi.wm.impl.content.ContentTabLabel`, in an `impl` package. Its
- * base class `BaseLabel` declares public `setActiveFg`/`setPassiveFg` and, crucially,
- * `paintComponent` reads the *fields* those setters write rather than the `getActiveFg`/
- * `getPassiveFg` getters — which matters, because `ContentTabLabel` overrides both getters to
- * return theme colours and ignore the fields. Painting therefore honours what we set; the getters
- * would not have. Verified identical in the 253 and 262 bytecode.
- *
- * Reflection rather than a direct reference for the same reason as [TerminalTabFacade]: an `impl`
- * class is not API, the Plugin Verifier flags a static reference to one, and a rename should cost
- * this one feature rather than loading the plugin at all.
- *
- * ## What resets it
- *
- * `BaseLabel.updateUI()` — a look-and-feel change — reassigns both fields to `JBColor.foreground()`.
- * Nothing else in the platform writes them. [TabStyleService] already invalidates and restyles
- * every tab on a theme change, which re-applies this along with everything else.
+ * Reflective because the class is in an `impl` package: the Plugin Verifier flags a static
+ * reference to one, and a rename should cost this feature rather than the whole plugin.
  */
 internal object TabLabelFacade {
 
-    private val LOG = logger<TabLabelFacade>()
-
     private const val TAB_LABEL_CLASS = "com.intellij.openapi.wm.impl.content.ContentTabLabel"
 
-    /**
-     * Bounds the search. The decorator holding one tool window is a few hundred components at
-     * most; without a cap, a fallback to the whole IDE frame on some future layout could walk
-     * tens of thousands on every restyle.
-     */
+    /** Bounds the search in case the fallback below ever has to walk a whole IDE frame. */
     private const val MAX_VISITED = 4000
+
+    private val LABEL = Key.create<WeakReference<Component>>("TabCue.tabLabel")
+
+    /**
+     * Failed searches, so a tab that has no label of this type stops being searched for.
+     *
+     * A collapsed tool window renders a `ContentComboLabel` instead, and nothing here will ever
+     * match it. Without a cap that tab would walk the decorator's whole component tree on every
+     * shell prompt. Cleared by [forget] whenever something invalidates the applied style.
+     */
+    private val MISSES = Key.create<Int>("TabCue.labelMisses")
+
+    private const val MAX_MISSES = 8
 
     private val loader = TabLabelFacade::class.java.classLoader
 
-    private val tabLabelClass: Class<*>? by lazy {
+    private val labelClass: Class<*>? by lazy {
         quietly { Class.forName(TAB_LABEL_CLASS, false, loader) }
     }
 
-    private val getContentMethod by lazy {
-        quietly { tabLabelClass?.getMethod("getContent") }
-    }
+    private val getContent by lazy { quietly { labelClass?.getMethod("getContent") } }
+    private val setActiveFg by lazy { quietly { labelClass?.getMethod("setActiveFg", Color::class.java) } }
+    private val setPassiveFg by lazy { quietly { labelClass?.getMethod("setPassiveFg", Color::class.java) } }
 
-    private val setActiveFgMethod by lazy {
-        quietly { tabLabelClass?.getMethod("setActiveFg", Color::class.java) }
-    }
-
-    private val setPassiveFgMethod by lazy {
-        quietly { tabLabelClass?.getMethod("setPassiveFg", Color::class.java) }
-    }
-
-    /** True once we have established the label class is not where we expect it. */
     private val unavailable: Boolean
-        get() = tabLabelClass == null ||
-            getContentMethod == null ||
-            setActiveFgMethod == null ||
-            setPassiveFgMethod == null
+        get() = labelClass == null || getContent == null || setActiveFg == null || setPassiveFg == null
 
     /**
-     * Paints [content]'s tab label in [color], or restores the theme default when it is null.
+     * Paints [content]'s tab label in [color], or hands it back to the theme when null.
      *
-     * Returns false when the label could not be found, which is the normal case for a tab whose
-     * tool window has never been shown — the label does not exist until then. The caller treats
-     * that as "not settled yet" and retries, rather than caching a miss.
+     * Returns false when the label cannot be found, which is normal for a tab whose tool window
+     * has never been shown. The caller retries rather than caching that.
      */
     fun applyTextColor(content: Content, color: Color?): Boolean {
         if (unavailable) return false
 
-        val label = findLabelFor(content) ?: return false
-        // JBColor.foreground() is exactly what BaseLabel.updateUI() assigns, so clearing restores
-        // the platform's own value rather than an approximation of it.
+        val misses = content.getUserData(MISSES) ?: 0
+        // Reported as settled, not failed: the caller should stop asking rather than keep retrying.
+        if (misses >= MAX_MISSES) return true
+
+        val label = labelFor(content)
+        if (label == null) {
+            content.putUserData(MISSES, misses + 1)
+            return false
+        }
+        content.putUserData(MISSES, null)
+
+        // JBColor.foreground() is what BaseLabel.updateUI assigns, so clearing restores the
+        // platform's own value rather than an approximation of it.
         val target: Color = color ?: JBColor.foreground()
+
+        // paintComponent copies whichever field applies into the JLabel foreground, which is the
+        // only way to see whether our value is still in place. Skipping the write when it is keeps
+        // this callable on every restyle without repainting the tab strip each time.
+        if (label.foreground == target) return true
+
         return quietly {
-            setActiveFgMethod?.invoke(label, target)
-            setPassiveFgMethod?.invoke(label, target)
-            // The fields are only read while painting, and nothing above fires an event.
+            setActiveFg?.invoke(label, target)
+            setPassiveFg?.invoke(label, target)
             label.repaint()
             true
         } ?: false
     }
 
-    private fun findLabelFor(content: Content): Component? {
-        val root = searchRootFor(content) ?: return null
-        val labelClass = tabLabelClass ?: return null
-        val getContent = getContentMethod ?: return null
+    /** Drops what we remember about a tab, so the next call searches again. */
+    fun forget(content: Content) {
+        content.putUserData(LABEL, null)
+        content.putUserData(MISSES, null)
+    }
 
+    private fun labelFor(content: Content): Component? =
+        cached(content) ?: search(content)?.also { content.putUserData(LABEL, WeakReference(it)) }
+
+    private fun cached(content: Content): Component? {
+        val label = content.getUserData(LABEL)?.get() ?: return null
+        // Labels are recycled, so a stale reference could otherwise recolour somebody else's tab.
+        val ours = quietly { getContent?.invoke(label) } === content
+        return label.takeIf { ours && it.isDisplayable }
+    }
+
+    private fun search(content: Content): Component? {
+        val root = searchRoot(content) ?: return null
+        val labelClass = labelClass ?: return null
         var visited = 0
-        fun search(component: Component): Component? {
+
+        fun find(component: Component): Component? {
             if (visited++ > MAX_VISITED) return null
-            if (labelClass.isInstance(component)) {
-                val owner = quietly { getContent.invoke(component) }
-                if (owner === content) return component
+            if (labelClass.isInstance(component) && quietly { getContent?.invoke(component) } === content) {
+                return component
             }
             if (component is Container) {
-                for (child in component.components) {
-                    search(child)?.let { return it }
-                }
+                for (child in component.components) find(child)?.let { return it }
             }
             return null
         }
-        return search(root)
+        return find(root)
     }
 
     /**
-     * The smallest container that holds both the tab strip and the content panel.
-     *
-     * The labels are siblings of the content, not children of it, so the search cannot start at
-     * `content.component`. Walking up to the tool window's `InternalDecorator` keeps the sweep to
-     * one tool window; if that class is ever renamed the window ancestor still finds the label,
-     * just over a wider tree, which is what [MAX_VISITED] is there for.
+     * The labels are siblings of the tab content rather than children, so the search cannot start
+     * at `content.component`. The tool window's decorator is the smallest container holding both.
      */
-    private fun searchRootFor(content: Content): Component? {
+    private fun searchRoot(content: Content): Component? {
         val start = quietly { content.component } ?: return null
         var current: Component? = start
         while (current != null) {
@@ -135,6 +137,5 @@ internal object TabLabelFacade {
             current = current.parent
         }
         return quietly { SwingUtilities.getWindowAncestor(start) }
-            ?.also { LOG.debug("No InternalDecorator above the tab; searching the window instead") }
     }
 }

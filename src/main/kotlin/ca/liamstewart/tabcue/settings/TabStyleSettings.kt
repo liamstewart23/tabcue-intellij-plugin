@@ -103,13 +103,13 @@ class TabStyleState {
      * Where per-tab overrides lived before they moved to the workspace file.
      *
      * Retained purely so styles set by an earlier build are migrated rather than silently dropped
-     * — the element name matches what that build wrote. Emptied on first access.
+     * The element name matches what that build wrote. Emptied on first access.
      */
     @get:XCollection(propertyElementName = "overrides")
     var legacyOverrides: MutableList<OverrideState> = mutableListOf()
 }
 
-/** Per-tab overrides, kept out of the shared file — see [TabStyleOverrides]. */
+/** Per-tab overrides, kept out of the shared file. See [TabStyleOverrides]. */
 class TabStyleOverridesState {
     @get:XCollection(propertyElementName = "overrides")
     var overrides: MutableList<OverrideState> = mutableListOf()
@@ -215,7 +215,7 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
         if (state.unknownRules.isNotEmpty()) {
             // Re-inserted where they were, not appended. Rules are first-match-wins, so appending
             // silently demotes a rule that the newer build had ranked above the ones this build
-            // understands — the style quietly changes rather than the rule being lost, which is
+            // understands. The style quietly changes rather than the rule being lost, which is
             // harder to notice than an outright deletion.
             state.unknownRules.sortedBy { it.order }.forEach { raw ->
                 val at = raw.order.takeIf { it in 0..state.rules.size } ?: state.rules.size
@@ -228,7 +228,7 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
     }
 
     /**
-     * Called instead of [loadState] when the project has no stored settings at all — a genuinely
+     * Called instead of [loadState] when the project has no stored settings at all, a genuinely
      * fresh install, which is the main case the starter rules exist for.
      */
     override fun noStateLoaded() {

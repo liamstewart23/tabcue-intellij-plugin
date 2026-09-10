@@ -3,15 +3,13 @@ package ca.liamstewart.tabcue.settings
 /**
  * Escapes text so it survives a round trip through the settings XML.
  *
- * Two classes of character do not: characters above the BMP (most emoji) are surrogate pairs in a
- * Java `String`, and a per-`char` XML validity check sees two lone surrogates and strips both —
- * the value comes back as an empty string with no error. Control characters are outright illegal
- * in XML 1.0 and can fail the write for the whole file, and a shell can put one in an OSC title,
- * which ends up in a style key.
+ * Two classes of character do not. Most emoji are surrogate pairs in a Java `String`, and a
+ * per-`char` XML validity check sees two lone surrogates and strips both, returning an empty
+ * string with no error. Control characters are illegal in XML 1.0 outright and can fail the write
+ * for the whole file, and a shell can put one in an OSC title that ends up in a style key.
  *
- * Anything problematic becomes `\\uXXXX`; a literal backslash is doubled. Ordinary text — which is
- * almost all of it, including rule patterns and directory paths — passes through untouched, so the
- * settings file stays readable.
+ * Anything problematic becomes `\\uXXXX` and a literal backslash is doubled. Ordinary text passes
+ * through untouched, so the settings file stays readable.
  */
 internal fun encodeXmlSafe(value: String?): String? {
     val text = value ?: return null
@@ -78,8 +76,8 @@ internal fun decodeXmlSafe(value: String?): String? {
  * have no business in a tab title or pattern, so they are escaped too rather than silently kept.
  *
  * XML *non-characters* are escaped for the same reason as surrogates: they are perfectly legal in a
- * Java `String` and illegal in XML 1.0, so letting one through — a shell can put anything in an OSC
- * title, and that title becomes part of a style key — risks the whole settings file failing to
+ * Java `String` and illegal in XML 1.0. A shell can put anything in an OSC title and that title
+ * becomes part of a style key, so letting one through risks the whole settings file failing to
  * write, which is precisely the failure this file exists to prevent.
  */
 private fun needsEscaping(ch: Char): Boolean =

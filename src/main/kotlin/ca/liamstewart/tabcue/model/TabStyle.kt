@@ -13,12 +13,9 @@ data class TabStyle(
     /** An emoji (or any short string) drawn as the tab icon; takes precedence over [iconId]. */
     val emoji: String? = null,
     /**
-     * The tab *label* colour: a [StylePalette.textColors] id or a literal `#RRGGBB`.
-     *
-     * Null means the theme decides, which is the right default — the tab fill is already derived
-     * to keep the label legible. This exists for the case that derivation cannot help with: the
-     * platform discards the tab colour entirely on the selected tab, so a user who wants a tab to
-     * stand out *while they are looking at it* has only the label left to colour.
+     * The tab label colour: a [StylePalette.textColors] id or a literal `#RRGGBB`, null for the
+     * theme's own. The one cue that survives selection, since the platform discards a tab's
+     * colour while that tab is selected.
      */
     val textColorId: String? = null,
 ) {

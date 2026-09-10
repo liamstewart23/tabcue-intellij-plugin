@@ -14,33 +14,25 @@ import java.awt.Color
 /**
  * The platform colour picker, opened as a popup anchored to the click.
  *
- * Deliberately the platform's own picker rather than anything hand-built: it already carries the
- * saturation/value field, a hex field, RGB spinners and the screen eyedropper, and it matches every
- * other colour control in the IDE. `ColorChooserService`, `ColorListener` and `ColorPanel` all
- * carry no `@ApiStatus` annotation, so this is plain public API — unlike the terminal access in
- * `TerminalTabFacade`, nothing here needs reflection.
+ * The platform's own rather than anything hand-built: it already has the hex field, RGB spinners
+ * and screen eyedropper, and it matches every other colour control in the IDE. Plain public API,
+ * so unlike `TerminalTabFacade` none of this needs reflection.
  *
- * Opacity is switched off. A tab's alpha would be meaningless in two of the three places a colour
- * is used — `JBDefaultTabPainter` blends using the *overlay's* alpha and ignores ours, and the
- * background tint already has its own strength slider — so an alpha channel would look like it
- * worked and then be silently dropped or fight the slider.
+ * Opacity is switched off, because alpha would be silently dropped: `JBDefaultTabPainter` blends
+ * using the overlay's alpha and ignores ours, and the tint has its own strength slider.
  */
 internal object ColorPickerPopup {
 
     /**
      * Commits are coalesced, and the final value is committed again when the popup closes.
      *
-     * The platform fires [ColorListener] on every mouse-move inside the saturation field — tens of
-     * events per second. Each commit persists an override and fires the settings change listener,
-     * which restyles *every* known tab, and each tab's restyle resolves its identity through a
-     * reflective terminal-tab lookup. Committing per event put that whole fan-out on the EDT
-     * dozens of times a second while the user was still dragging, and queued a follow-up
-     * `invokeLater` restyle for each one. Debouncing keeps the preview live at ~12 fps for a
-     * fraction of the work; the commit on close covers the case where the last movement is still
-     * pending when the popup is dismissed.
+     * [ColorListener] fires on every mouse-move inside the saturation field, and each commit
+     * restyles every known tab, resolving each one's identity through a reflective lookup. Per
+     * event that put the whole fan-out on the EDT dozens of times a second while the user was
+     * still dragging. Debouncing keeps the preview live for a fraction of the work, and the commit
+     * on close catches a movement still pending when the popup is dismissed.
      *
-     * There is no cancel: dismissing keeps the last colour, matching the platform's own colour
-     * popups.
+     * There is no cancel: dismissing keeps the last colour, like the platform's own colour popups.
      */
     fun show(event: AnActionEvent, project: Project, current: Color?, onPicked: (Color) -> Unit) {
         // Same anchoring the emoji popup uses, via the factory rather than the mouse position, so

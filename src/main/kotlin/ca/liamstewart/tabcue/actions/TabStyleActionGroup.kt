@@ -27,22 +27,22 @@ import javax.swing.Icon
 /**
  * The "Tab Style" submenu on a terminal tab's right-click menu.
  *
- * Registered into the platform's `ToolWindowContextMenu` group — the same group the bundled
- * terminal uses for "Rename Session" — and hidden for every tool window except the terminal.
+ * Registered into the platform's `ToolWindowContextMenu` group, the same one the bundled terminal
+ * uses for "Rename Session", and hidden for every tool window except the terminal.
  */
 internal class TabStyleActionGroup : DefaultActionGroup(), DumbAware {
 
     /**
      * Built once, not per render.
      *
-     * The children are stateless — each receives the clicked [Content] through its own `update` —
+     * The children are stateless, each receiving the clicked [Content] through its own `update`,
      * so rebuilding twenty-odd actions and eight icons every time the submenu opens was pure waste
      * on the EDT during popup layout.
      */
     private val children: Array<AnAction> by lazy {
         arrayOf(
             // Three submenus rather than three separator-delimited sections in one list. Flat, the
-            // menu came to 38 items and five separators — around 950px, which scrolls on a 1080p
+            // menu came to 38 items and five separators, around 950px, which scrolls on a 1080p
             // display, and scrolling to reach a colour swatch is the opposite of quick. Grouping
             // also disambiguates the two "Custom…" entries, which read identically side by side.
             // "Tab Color" rather than "Color" only since "Text Color" joined it: two rows a few
@@ -80,7 +80,7 @@ internal class TabStyleActionGroup : DefaultActionGroup(), DumbAware {
                     }
                 },
             ),
-            // The common emoji are still one click away once the submenu is open — no dialog, which
+            // The common emoji are still one click away once the submenu is open, with no dialog,
             // was the point of moving them out of a modal in the first place.
             submenu(
                 "Emoji",
@@ -105,7 +105,7 @@ internal class TabStyleActionGroup : DefaultActionGroup(), DumbAware {
      * A nested popup group.
      *
      * The children stay [ToolWindowContextMenuActionBase]s, so each is still handed the clicked
-     * `Content` through the supported callback — nesting changes the presentation, not the data
+     * `Content` through the supported callback, since nesting changes the presentation, not the data
      * context. `setText(…, false)` because a swatch or icon name is not a mnemonic carrier.
      */
     private fun submenu(text: String, children: List<AnAction>): AnAction =
@@ -120,7 +120,7 @@ internal class TabStyleActionGroup : DefaultActionGroup(), DumbAware {
     override fun update(e: AnActionEvent) {
         // Only the tool window is checked here. Resolving the clicked Content would mean calling
         // ToolWindowContextMenuActionBase.getContextContent, which is @ApiStatus.Internal (Plugin
-        // Verifier flags it) — and it is unnecessary: each child extends
+        // Verifier flags it), and it is unnecessary: each child extends
         // ToolWindowContextMenuActionBase and is handed the Content through the supported
         // update(event, toolWindow, content) callback, hiding itself when there is none.
         val toolWindow = e.getData(PlatformDataKeys.TOOL_WINDOW)
@@ -186,7 +186,7 @@ private class CustomColorAction : TabStyleAction("Custom…", null) {
     override fun updateFor(e: AnActionEvent, service: TabStyleService, content: Content) {
         val custom = service.manualStyleFor(content).colorId?.takeIf { ColorMath.isCustom(it) }
         // setText(text, false): the single-argument overload treats '_' and '&' as mnemonic
-        // markers, and the emoji field accepts any string — an emoji of "_" would vanish from the
+        // markers, and the emoji field accepts any string, so an emoji of "_" would vanish from the
         // menu and underline the next character instead.
         e.presentation.setText(if (custom == null) "Custom…" else "Custom ($custom)…", false)
         // Shows the chosen colour in the menu, the way the preset entries show theirs.
@@ -276,7 +276,7 @@ private class CustomEmojiAction : TabStyleAction("Custom…", null) {
         val emoji = service.manualStyleFor(content).emoji?.takeIf { it.isNotBlank() }
         val custom = emoji?.takeUnless { it in StylePalette.emojis }
         // setText(text, false): the single-argument overload treats '_' and '&' as mnemonic
-        // markers, and the emoji field accepts any string — an emoji of "_" would vanish from the
+        // markers, and the emoji field accepts any string, so an emoji of "_" would vanish from the
         // menu and underline the next character instead.
         e.presentation.setText(if (custom == null) "Custom…" else "Custom ($custom)…", false)
         Toggleable.setSelected(e.presentation, custom != null)
@@ -300,7 +300,7 @@ private class ToggleTintAction : TabStyleAction("Tint Terminal Background", null
         e.presentation.isEnabled = allowed && manual.colorId != null
         e.presentation.description = when {
             !allowed -> "Turn on \"Allow tinting the terminal background\" in settings first"
-            manual.colorId == null -> "Pick a tab color first — the tint is derived from it"
+            manual.colorId == null -> "Pick a tab color first, because the tint is derived from it"
             else -> "Tint this session's output area"
         }
     }

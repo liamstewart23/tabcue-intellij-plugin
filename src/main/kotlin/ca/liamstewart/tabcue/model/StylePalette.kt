@@ -8,16 +8,11 @@ import javax.swing.Icon
 /**
  * The curated set of colours and icons a tab can use.
  *
- * Each colour is an *accent*, at full strength: it is what the dot icon and the background tint are
- * drawn in. It is deliberately not what the tab background is painted with — [ColorMath] derives
- * that, mixing the accent part-way into the tab-strip background so the tab label keeps its
- * contrast, then compensating for the translucent overlay the platform's tab painter composites
- * on top. That indirection is what lets a user pick any colour at all without being able to make
- * a tab unreadable.
- *
- * The accents below are far stronger than a tab background could safely be, for exactly that
- * reason. Light and dark values differ only in brightness, so a dot reads against either
- * tab strip.
+ * Each colour is an accent at full strength, used for the dot icon and the background tint. It is
+ * not what the tab background is painted with: [ColorMath] derives that, which is what lets a user
+ * pick any colour without being able to make a tab unreadable. The accents are therefore stronger
+ * than a tab background could safely be. Light and dark values differ only in brightness, so a dot
+ * reads against either tab strip.
  */
 object StylePalette {
 
@@ -52,7 +47,7 @@ object StylePalette {
     /**
      * The icon a tab should actually show.
      *
-     * Precedence is emoji, then a chosen icon, then — when [colorAsDot] is on — a dot in the tab's
+     * Precedence is emoji, then a chosen icon, then, when [colorAsDot] is on, a dot in the tab's
      * colour. That last fallback is what keeps a colour-only style visible: the platform's tab
      * painter discards the tab background colour on the selected tab and blends an opaque hover
      * colour over it on hover, whereas the icon is painted in every state.
@@ -73,9 +68,8 @@ object StylePalette {
     data class EmojiChoice(val emoji: String, val displayName: String)
 
     /**
-     * Named, because a menu row shows the glyph as its icon: with the glyph *also* as the row's
-     * text every entry rendered the same emoji twice, side by side. The name is what makes the
-     * row readable, and it makes the menu searchable by word rather than by pictogram.
+     * Named because a menu row already shows the glyph as its icon. Using the glyph as the row
+     * text too drew it twice side by side, and the name makes the menu searchable by word.
      */
     val emojiChoices: List<EmojiChoice> = listOf(
         EmojiChoice("🚀", "Rocket"),
@@ -92,28 +86,25 @@ object StylePalette {
         EmojiChoice("🧹", "Cleanup"),
     )
 
-    /** The glyphs alone, for "is this one of the curated set?" checks and for the rule editor. */
+    /** The glyphs alone, for "is this one of the curated set?" checks and the rule editor. */
     val emojis: List<String> = emojiChoices.map { it.emoji }
 
     data class TextColor(val id: String, val displayName: String, val color: JBColor)
 
     /**
-     * Tab *label* colours.
+     * Tab label colours. Two presets only: against a coloured tab the real choice is light text or
+     * dark text, and anything else goes through Custom.
      *
-     * Only two presets, deliberately: against a coloured tab the useful choice is essentially
-     * "light text" or "dark text", and offering ten tints of each would be choice for its own
-     * sake. Anything else goes through Custom, which is the same colour picker the accents use.
-     *
-     * Both are theme-independent — the point of picking one is to override what the theme would
-     * have chosen — so the light and dark values of each JBColor are identical. Black is softened
-     * to 0x1A1A1A because pure black on a mid-tone tab reads as a rendering artefact.
+     * Light and dark values are identical, because the point of picking one is to override what
+     * the theme would have chosen. Black is softened to 0x1A1A1A, since pure black on a mid-tone
+     * tab reads as a rendering artefact.
      */
     val textColors: List<TextColor> = listOf(
         TextColor("white", "White", JBColor(0xF2F2F2, 0xF2F2F2)),
         TextColor("black", "Black", JBColor(0x1A1A1A, 0x1A1A1A)),
     )
 
-    /** The label colour for a `textColorId`: a preset id, a literal `#RRGGBB`, or null for theme. */
+    /** A preset id, a literal `#RRGGBB`, or null for the theme's own. */
     fun textColor(id: String?): Color? = when {
         id == null -> null
         ColorMath.isCustom(id) -> ColorMath.parseCustom(id)

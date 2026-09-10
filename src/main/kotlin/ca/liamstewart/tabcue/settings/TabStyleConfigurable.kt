@@ -93,7 +93,7 @@ internal class TabStyleConfigurable(private val project: Project) : SearchableCo
                 row {
                     cell(allowTint)
                         .comment(
-                            "A kill switch, not an opt-in &mdash; turn tinting on per tab from the " +
+                            "A kill switch, not an opt-in. Turn tinting on per tab from the " +
                                 "tab's <b>Tab Style</b> menu. Recoloring the output area relies on " +
                                 "internal IDE structure, so clear this if an IDE update breaks it. " +
                                 "Tab colors and icons are unaffected either way."
@@ -211,7 +211,7 @@ private object StyleColumn : ColumnInfo<StyleRule, String>("Style") {
             }
             if (item.style.tintBackground) add("tinted")
         }
-        return if (parts.isEmpty()) "—" else parts.joinToString(", ")
+        return if (parts.isEmpty()) "None" else parts.joinToString(", ")
     }
 }
 
