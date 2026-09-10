@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
-# Convenience wrapper: PhpStorm's bundled JBR is the only JDK on this machine, and the gradlew
-# launcher needs JAVA_HOME set before it can read org.gradle.java.home.
+# Convenience wrapper. Gradle needs a JDK to start; if none is on JAVA_HOME, fall back to the
+# JetBrains Runtime bundled with a local IDE, which is a full JDK. The JDK used to *compile* is
+# provisioned by the toolchain in build.gradle.kts either way, so this only has to launch Gradle.
 set -euo pipefail
-export JAVA_HOME="${JAVA_HOME:-/Applications/PhpStorm.app/Contents/jbr/Contents/Home}"
+
+if [[ -z "${JAVA_HOME:-}" ]]; then
+  for candidate in /Applications/PhpStorm.app/Contents/jbr/Contents/Home \
+                   /Applications/IntelliJ*.app/Contents/jbr/Contents/Home; do
+    if [[ -x "$candidate/bin/java" ]]; then
+      export JAVA_HOME="$candidate"
+      break
+    fi
+  done
+fi
+
 exec ./gradlew "$@"
