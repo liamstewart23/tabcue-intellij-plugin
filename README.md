@@ -55,8 +55,24 @@ which don't belong in a shared file. Nothing leaves your machine.
 The build provisions its own JDK 21, so there's nothing to install first.
 
 Compiled against the 2025.3 SDK (platform branch `253`) — that's the baseline, not a ceiling.
-`since-build` is `253` with no upper bound, and each release is verified against IDEA, WebStorm,
-PyCharm and both PhpStorm branches, including 2026.2.
+`since-build` is `253` with no upper bound. Compiling against the oldest supported branch is
+deliberate: it's what makes the compiler reject anything missing from 2025.3, rather than finding
+out later.
+
+1.0.0 passes the JetBrains Plugin Verifier against all five, with 89 tests green and no compiler
+warnings:
+
+| IDE | Build |
+| --- | --- |
+| PhpStorm 2026.2.2 | `PS-262.10315.130` |
+| PhpStorm 2025.3.6.1 | `PS-253.33813.65` |
+| IntelliJ IDEA 2025.3 | `IU-253.28294.334` |
+| WebStorm 2025.3 | `WS-253.28294.332` |
+| PyCharm 2025.3 | `PY-253.28294.336` |
+
+```bash
+./build.sh verifyPlugin
+```
 
 ## Licence
 
