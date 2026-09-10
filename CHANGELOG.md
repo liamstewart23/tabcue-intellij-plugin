@@ -57,6 +57,13 @@ First release.
   items and five separators — around 950px, which scrolls on a 1080p display. Grouping also
   disambiguates the two *Custom…* entries, which read identically side by side, and means the
   platform only has to update the handful of items actually on screen.
+- Emoji rows are `[glyph] Name`. Passing the emoji as both the row's icon and its text drew it
+  twice side by side, which reads as a rendering fault; the name also makes the menu searchable by
+  word rather than by pictogram.
+- The custom-emoji popup opens on the next EDT pass rather than synchronously. Opened immediately,
+  it was created while the context menu was still dismissing, so the mouse event that closed the
+  menu landed outside the new popup and `setCancelOnClickOutside` closed it again at once — the
+  symptom being a popup that never appeared.
 - Tint strength moved under the switch that gates it, follows its enabled state, and shows its
   value as you drag. A live slider for a feature that is switched off is a dead control.
 - New plugin logo: three differently coloured tabs rather than one highlighted tab, since telling
@@ -65,24 +72,14 @@ First release.
   working-directory query when the answer is already pinned — which it is for any tab styled by
   hand, and it was being asked once per menu item.
 
-### Fixed
-
-- **An icon set by another plugin is no longer destroyed.** PhpStorm 2026.2's "AI Agents" terminal
-  feature marks tabs it launches with an agent logo using exactly the two calls this plugin uses —
-  `putUserData(SHOW_CONTENT_ICON, true)` and `content.icon = …`. Because every terminal tab is
-  restyled whether or not it has a style, the unconditional clear wiped that logo the first time a
-  tab was touched. Only icons this plugin set are cleared now, and whatever was there beforehand
-  is put back when a style is removed.
-- **The custom-emoji popup now opens.** It was shown synchronously from an action that runs while
-  the context menu is still dismissing, so the mouse event that closed the menu arrived outside the
-  new popup and `setCancelOnClickOutside` closed it again immediately — the symptom being a popup
-  that never appeared at all. It now captures its anchor while the data context is still alive and
-  opens on the next EDT pass.
-- **Emoji menu rows no longer draw the glyph twice.** The emoji was passed as both the row's icon
-  and its text. Rows are `[glyph] Name`, which also makes the menu searchable by word.
-
 ### Hardened
 
+- An icon set by another plugin is never destroyed. PhpStorm 2026.2's "AI Agents" terminal feature
+  marks the tabs it launches with an agent logo using exactly the two calls this plugin uses —
+  `putUserData(SHOW_CONTENT_ICON, true)` and `content.icon = …`. Since every terminal tab is
+  restyled whether or not it has a style, clearing unconditionally would wipe that logo the moment
+  a tab was touched. Only icons this plugin set are cleared, and whatever was there beforehand is
+  restored when a style is removed.
 - The tab fill resolves lazily, so it follows a theme switch instead of freezing at whatever theme
   was in force when the tab was styled — and is memoised on the theme values it derives from,
   because `JBColor` calls its supplier on every channel read.
