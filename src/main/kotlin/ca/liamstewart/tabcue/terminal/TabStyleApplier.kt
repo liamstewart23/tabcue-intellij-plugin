@@ -15,6 +15,7 @@ import ca.liamstewart.tabcue.settings.TINT_STRENGTH_DEFAULT
 import ca.liamstewart.tabcue.util.guarded
 import ca.liamstewart.tabcue.util.quietly
 import java.awt.Color
+import javax.swing.Icon
 
 /**
  * Writes a [TabStyle] onto a tab's [Content].
@@ -57,6 +58,12 @@ object TabStyleApplier {
 
     /** Whether we currently have a forced foreground on this tab's label. */
     private val TEXT_COLORED = Key.create<Boolean>("TabCue.textColored")
+
+    /** Whether the icon currently on this tab is one we set. */
+    private val ICON_OWNED = Key.create<Boolean>("TabCue.iconOwned")
+
+    /** The icon somebody else had set before we replaced it, so clearing can put it back. */
+    private val FOREIGN_ICON = Key.create<Icon>("TabCue.foreignIcon")
 
     /**
      * An editor's background from before we first touched it.
@@ -160,23 +167,49 @@ object TabStyleApplier {
         return applied
     }
 
+    /**
+     * Sets the tab icon, without destroying an icon somebody else owns.
+     *
+     * PhpStorm 2026.2 made this matter. Its "AI Agents" terminal feature sets an agent logo with
+     * *exactly* the two calls used here — `putUserData(SHOW_CONTENT_ICON, true)` and
+     * `content.icon = agent.icon` — on tabs it launches (Codex and Junie today; Claude Code
+     * declares `showIconInTab = false`). Since this runs on every terminal tab, styled or not, an
+     * unconditional `content.icon = null` silently wiped that logo the first time we touched the
+     * tab. So: only ever clear an icon we set, and put back whatever was there before we did.
+     */
     private fun applyIcon(content: Content, style: TabStyle, colorAsDot: Boolean) {
         val icon = StylePalette.iconFor(style, colorAsDot)
+        val owned = content.getUserData(ICON_OWNED) == true
+
+        if (icon == null) {
+            // Nothing of ours on this tab: leave it exactly as we found it.
+            if (!owned) return
+            val restored = content.getUserData(FOREIGN_ICON)
+            content.putUserData(ToolWindow.SHOW_CONTENT_ICON, if (restored != null) true else null)
+            content.putUserData(
+                ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT,
+                if (restored != null) false else null,
+            )
+            content.icon = restored
+            content.putUserData(ICON_OWNED, null)
+            content.putUserData(FOREIGN_ICON, null)
+            return
+        }
+
+        // Captured before the first overwrite and only then, so a later restyle cannot mistake one
+        // of our own icons for the platform's.
+        if (!owned) content.putUserData(FOREIGN_ICON, quietly { content.icon })
 
         // Order is load-bearing. `BaseLabel.updateTextAndIcon` reads both flags below while it
         // handles the PROP_ICON change, and writing user data fires no event of its own. Setting
         // the icon *last* is therefore what makes it appear immediately; with the icon set first
         // the label would refresh before the flags were true and only pick the icon up on the next
         // unrelated tab update — which is why it previously took a click on the tab to show up.
-        // Removed rather than set to false when we have no icon: leaving the flag behind would
-        // permanently suppress any content icon the terminal or another plugin later wants to show.
-        content.putUserData(ToolWindow.SHOW_CONTENT_ICON, if (icon != null) true else null)
+        content.putUserData(ToolWindow.SHOW_CONTENT_ICON, true)
         // Without this, unselected tabs render the icon at 50% alpha as a WatermarkIcon.
-        content.putUserData(
-            ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT,
-            if (icon != null) false else null,
-        )
+        content.putUserData(ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT, false)
         content.icon = icon
+        content.putUserData(ICON_OWNED, true)
     }
 
     /** Returns false when a tint was wanted but no editor could be found, so it can be retried. */

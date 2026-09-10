@@ -11,10 +11,18 @@ now have its own colour, icon or emoji.
 
 - **Colours** — eight presets, or *Custom…* for the IDE's full colour picker (hex, RGB,
   eyedropper). Shown as the tab background *and* a small dot.
+- **Text colour** — white, black or custom. Worth knowing: the IDE throws away a tab's colour
+  while that tab is selected, so the label is the one cue that survives. This is how you keep a
+  tab identifiable when you're actually looking at it.
 - **Icons and emoji** — a built-in icon or any emoji, picked from the tab menu.
 - **Rules** — style tabs automatically by title or working directory. Give each agent session its
   own emoji, or paint anything matching `ssh prod` red.
 - **Background tint** — optionally tint the terminal output area too, not just the tab.
+
+It works before you configure anything. A new project starts with rules for **Claude Code, Codex,
+Junie and aider**, each with its own colour and emoji, and *Tools ▸ TabCue ▸ auto-assign colours*
+gives every other terminal a colour derived from its own name and directory — so it's the same
+colour tomorrow, not whatever was next in the list.
 
 Right-click any Terminal tab → **Tab Style**. Settings live under *Tools ▸ TabCue*.
 

@@ -232,4 +232,12 @@ class TabStyleStateSerializationTest {
         )
         assertEquals("#FF8800", overrides.overrides.single().textColorId)
     }
+
+    @Test
+    fun `the starter-rules flag survives a round trip so they are not re-added`() {
+        // Without this flag persisting, deleting the shipped agent rules would be undone the next
+        // time the project opened — the most annoying possible behaviour.
+        val state = TabStyleState().apply { seededStarterRules = true }
+        assertTrue(roundTrip(state).seededStarterRules)
+    }
 }

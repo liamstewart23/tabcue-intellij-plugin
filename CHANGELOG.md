@@ -37,6 +37,19 @@ First release.
   it, so clearing a tab is not immediately repainted by a matching rule.
 - *Configure Rules…* in the tab menu, and a settings page under *Tools ▸ TabCue* that is findable
   from Settings search.
+- **Starter rules for AI agents.** A project with no rules of its own begins with one rule each
+  for Claude Code, Codex, Junie and aider — distinct colour *and* distinct emoji, since the case
+  they exist for is three agent tabs open at once. Matching is on the tab title, which the terminal
+  keeps in sync with the shell's title, so they fire whether the IDE launched the agent or you
+  typed the command. Seeded once and only into an empty rule list, so deleting them sticks.
+- **Per-tab text colour** — white, black or custom, from the *Text Color* submenu. This is the
+  only cue that survives selection: `JBDefaultTabPainter.getCustomBackground` does not blend a
+  custom tab colour when the tab is selected, it discards it and substitutes a theme colour.
+- **Auto-assigned colours are now derived from the tab** — its title and working directory —
+  rather than handed out as "the first palette entry no other tab is using". A tab therefore keeps
+  its colour across restarts and across machines, instead of being reshuffled every time a project
+  reopened, which taught you to stop reading the colours. Distinctness still wins on a collision:
+  the derivation only chooses where to start looking.
 
 ### Polish
 
@@ -51,6 +64,22 @@ First release.
 - Asking for a tab's identity no longer performs a reflective terminal lookup and a shell
   working-directory query when the answer is already pinned — which it is for any tab styled by
   hand, and it was being asked once per menu item.
+
+### Fixed
+
+- **An icon set by another plugin is no longer destroyed.** PhpStorm 2026.2's "AI Agents" terminal
+  feature marks tabs it launches with an agent logo using exactly the two calls this plugin uses —
+  `putUserData(SHOW_CONTENT_ICON, true)` and `content.icon = …`. Because every terminal tab is
+  restyled whether or not it has a style, the unconditional clear wiped that logo the first time a
+  tab was touched. Only icons this plugin set are cleared now, and whatever was there beforehand
+  is put back when a style is removed.
+- **The custom-emoji popup now opens.** It was shown synchronously from an action that runs while
+  the context menu is still dismissing, so the mouse event that closed the menu arrived outside the
+  new popup and `setCancelOnClickOutside` closed it again immediately — the symptom being a popup
+  that never appeared at all. It now captures its anchor while the data context is still alive and
+  opens on the next EDT pass.
+- **Emoji menu rows no longer draw the glyph twice.** The emoji was passed as both the row's icon
+  and its text. Rows are `[glyph] Name`, which also makes the menu searchable by word.
 
 ### Hardened
 

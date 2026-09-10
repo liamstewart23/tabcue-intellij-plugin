@@ -200,4 +200,48 @@ class TabStyleServiceTest : BasePlatformTestCase() {
         repeat(20) { assertEquals("the pinned key must not drift", first, service.styleKeyFor(content)) }
         assertEquals("teal", service.manualStyleFor(content).colorId)
     }
+
+    fun testAnIconSetByAnotherPluginSurvivesBeingStyledAndUnstyled() {
+        // PhpStorm 2026.2 sets an agent logo on terminal tabs it launches, using the same two
+        // calls this plugin does. Since every terminal tab is restyled whether or not it has a
+        // style, an unconditional clear wiped that logo the moment we touched the tab.
+        val content = newContent("agent")
+        val foreign = com.intellij.icons.AllIcons.General.Information
+        content.icon = foreign
+
+        // Styling a tab that has no style of its own must leave the foreign icon alone.
+        service.restyle(content)
+        assertSame("an unstyled tab must not lose a foreign icon", foreign, content.icon)
+
+        // An explicit choice does replace it — the user asked for that.
+        service.setManualStyle(content) { it.copy(emoji = "\uD83D\uDE80") }
+        assertNotSame(foreign, content.icon)
+
+        // ...and clearing puts back what was there before, rather than leaving the tab bare.
+        service.clearManualStyle(content)
+        assertSame("clearing should restore the foreign icon", foreign, content.icon)
+    }
+
+    fun testAutoColoursAreDerivedFromTheTabRatherThanTheOrderTabsOpened() {
+        settings.autoAssignColors = true
+        val content = newContent("stable")
+
+        service.restyle(content)
+
+        // The property worth pinning is that the colour is a pure function of the tab's identity,
+        // not of how many tabs were styled before it. Previously it was "the first palette entry
+        // no sibling is using", so reopening a project handed every terminal a different colour
+        // than the day before — which teaches you to stop reading the colours.
+        //
+        // String.hashCode is specified by the JDK, so this expectation is stable across JVMs and
+        // machines, which is exactly the guarantee being claimed.
+        val key = service.styleKeyFor(content)
+        val expected = StylePalette.colorIdAt(key.hashCode())
+
+        assertEquals(
+            "auto colour should be derived from the tab key",
+            ColorMath.tabFill(StylePalette.color(expected)!!),
+            content.tabColor,
+        )
+    }
 }

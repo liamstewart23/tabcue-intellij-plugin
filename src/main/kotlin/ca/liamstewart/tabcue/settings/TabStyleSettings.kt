@@ -12,6 +12,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.XCollection
 import ca.liamstewart.tabcue.model.MatchField
+import ca.liamstewart.tabcue.model.StarterRules
 import ca.liamstewart.tabcue.model.StyleRule
 import ca.liamstewart.tabcue.model.TabStyle
 
@@ -80,6 +81,14 @@ class TabStyleState {
 
     @get:XCollection(propertyElementName = "rules")
     var rules: MutableList<RuleState> = mutableListOf()
+
+    /**
+     * Whether the AI-agent starter rules have already been offered to this project.
+     *
+     * Separate from "the rule list is empty" so that deleting them sticks: without the flag, the
+     * next project open would helpfully put them all back.
+     */
+    var seededStarterRules: Boolean = false
 
     /**
      * Rules whose `field` this build does not recognise, kept verbatim.
@@ -214,7 +223,30 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
             }
             state.unknownRules = mutableListOf()
         }
+        seedStarterRulesIfUntouched()
         cachedRules = null
+    }
+
+    /**
+     * Called instead of [loadState] when the project has no stored settings at all — a genuinely
+     * fresh install, which is the main case the starter rules exist for.
+     */
+    override fun noStateLoaded() {
+        seedStarterRulesIfUntouched()
+        cachedRules = null
+    }
+
+    /**
+     * Adds the agent starter rules, once, and only to a project that has no rules of its own.
+     *
+     * The flag is set even when nothing is added, so a project that already had rules is not
+     * re-examined every time it opens. Reaches for no other service, which is what `loadState`
+     * requires of anything it calls.
+     */
+    private fun seedStarterRulesIfUntouched() {
+        if (state.seededStarterRules) return
+        state.seededStarterRules = true
+        if (state.rules.isEmpty()) setRules(StarterRules.agentRules())
     }
 
     /** The [parent] disposable is required so a dynamic plugin reload cannot double-register. */

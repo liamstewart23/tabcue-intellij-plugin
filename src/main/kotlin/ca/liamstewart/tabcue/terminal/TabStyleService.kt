@@ -382,18 +382,30 @@ class TabStyleService(val project: Project) : Disposable {
         if (settings.isSuppressed(key)) return TabStyle.EMPTY
         settings.overrideFor(key)?.let { return it }
         RuleMatcher.firstMatch(settings.rules(), factsFor(content, info))?.let { return it.style }
-        if (settings.autoAssignColors) return TabStyle(colorId = autoColorFor(content))
+        if (settings.autoAssignColors) return TabStyle(colorId = autoColorFor(content, key))
         return TabStyle.EMPTY
     }
 
     /**
-     * Picks a palette colour not already on another tab, so open tabs stay distinguishable.
+     * Picks a palette colour for a tab that has no style of its own.
      *
-     * Pinned per tab on first use. Without that it would be recomputed on every terminal title
-     * change against whatever the other tabs currently show, so a tab's colour would visibly
-     * change as its neighbours came and went.
+     * Derived from the tab's own identity — [key] is its title and working directory — rather than
+     * handed out in the order tabs happen to open. That is what makes the colour a property of the
+     * *tab* instead of the session: the same tab comes back the same colour after a restart, and
+     * on a colleague's machine, because `String.hashCode` is specified by the JDK rather than
+     * being an implementation detail. Handing out "first unused" instead meant reopening a project
+     * and finding every terminal a different colour than yesterday, which trains you to ignore the
+     * colours entirely.
+     *
+     * Distinctness still wins where the two conflict: the hash only chooses where to *start*, and
+     * a colour already on a sibling is skipped. Two tabs therefore never collide just because
+     * their names happened to hash together, and with fewer tabs than colours the walk almost
+     * never moves.
+     *
+     * Pinned per tab on first use, because this is re-resolved on every terminal title change and
+     * the sibling set changes as tabs come and go.
      */
-    private fun autoColorFor(content: Content): String {
+    private fun autoColorFor(content: Content, key: String): String {
         content.getUserData(AUTO_COLOR)?.let { return it }
 
         val others = siblingsOf(content)
@@ -402,8 +414,15 @@ class TabStyleService(val project: Project) : Disposable {
         val inUse = others.flatMap { other ->
             listOfNotNull(other.getUserData(AUTO_COLOR), TabStyleApplier.appliedStyle(other)?.colorId)
         }.toSet()
-        val chosen = StylePalette.colors.firstOrNull { it.id !in inUse }?.id
-            ?: StylePalette.colorIdAt(others.size)
+
+        val start = key.hashCode().mod(StylePalette.colors.size)
+        val chosen = StylePalette.colors.indices.asSequence()
+            .map { StylePalette.colorIdAt(start + it) }
+            .firstOrNull { it !in inUse }
+            // Every colour is taken: more tabs than the palette has entries, so a repeat is
+            // unavoidable. Repeat this tab's own colour rather than an arbitrary one.
+            ?: StylePalette.colorIdAt(start)
+
         content.putUserData(AUTO_COLOR, chosen)
         return chosen
     }
