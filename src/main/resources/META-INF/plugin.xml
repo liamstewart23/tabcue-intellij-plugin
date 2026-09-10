@@ -1,0 +1,65 @@
+<idea-plugin>
+    <!-- Permanent: the Marketplace identifies updates by this and it cannot be changed later. -->
+    <id>ca.liamstewart.tabcue</id>
+    <name>TabCue: Visual Terminal Tabs</name>
+
+    <!-- Shown publicly on the plugin page and used for user support mail. Approval requires both
+         the address and the URL to be valid and reachable. -->
+    <vendor email="hello+jetbrains@liamstewart.ca" url="https://liamstewart.ca">Liam Stewart</vendor>
+
+    <description><![CDATA[
+        <p>Style terminal tabs with custom colours, background hints, and emojis so you can tell
+        terminals and AI agents apart at a glance.</p>
+
+        <h3>What it does</h3>
+        <ul>
+            <li><b>Style a tab by hand</b> &mdash; right-click any Terminal tab and pick a colour,
+                an icon, or an emoji.</li>
+            <li><b>Or let rules do it</b> &mdash; match on a tab's title or working directory and
+                have the style applied automatically. Give each agent session its own emoji so a
+                long-running agent is never mistaken for a free shell, or paint anything matching
+                <code>ssh prod</code> red so you always know which machine you are on.</li>
+            <li><b>Tint the output area</b> &mdash; optionally recolour the terminal background
+                itself, not just the tab, for sessions you really do not want to mix up.</li>
+        </ul>
+
+        <h3>Notes</h3>
+        <ul>
+            <li>A tab's colour is also drawn as a small dot, because the IDE's tab painter replaces
+                a custom tab colour while a tab is selected or hovered. The dot stays visible in
+                every state.</li>
+            <li>Works in every IntelliJ-based IDE that bundles the Terminal &mdash; IntelliJ IDEA,
+                PhpStorm, WebStorm, PyCharm, GoLand, RubyMine and the rest &mdash; and with both
+                terminal engines. Split terminals share one tab colour, since a split is several
+                sessions in a single tab.</li>
+            <li>Rules are stored in <code>.idea/terminalTabStyle.xml</code> so they can be shared;
+                per-tab styles live in <code>workspace.xml</code> because their identifiers contain
+                local paths. Nothing is sent anywhere.</li>
+        </ul>
+    ]]></description>
+
+    <!-- Terminal tab access needs the bundled terminal plugin; the platform alone is not enough. -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.plugins.terminal</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <postStartupActivity
+            implementation="ca.liamstewart.tabcue.terminal.TabStyleStartupActivity"/>
+        <projectConfigurable
+            id="ca.liamstewart.tabcue.settings"
+            parentId="tools"
+            instance="ca.liamstewart.tabcue.settings.TabStyleConfigurable"
+            displayName="TabCue"/>
+    </extensions>
+
+    <actions>
+        <group id="TabCue.Menu"
+               class="ca.liamstewart.tabcue.actions.TabStyleActionGroup"
+               text="Tab Style"
+               popup="true">
+            <!-- "last", not "first": this is a platform-owned menu and the terminal's own
+                 New Tab / Rename Session belong above a third-party submenu. -->
+            <add-to-group group-id="ToolWindowContextMenu" anchor="last"/>
+        </group>
+    </actions>
+</idea-plugin>

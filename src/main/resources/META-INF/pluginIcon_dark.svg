@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+  <!-- Dark variant of pluginIcon.svg: the palette's dark-theme accents, and a lighter window
+       outline so the frame keeps its contrast against a dark background. -->
+  <rect x="2" y="4" width="11" height="7" rx="2" fill="#F07B7B"/>
+  <rect x="14.5" y="4" width="11" height="7" rx="2" fill="#548AF7"/>
+  <rect x="27" y="4" width="11" height="7" rx="2" fill="#4FC0BD"/>
+  <rect x="2" y="13" width="36" height="23" rx="3" fill="none" stroke="#9DA0A8" stroke-width="2"/>
+  <path d="M8.5 21.5l4 3.5-4 3.5" fill="none" stroke="#548AF7" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="16" y="26.8" width="13" height="2.4" rx="1.2" fill="#9DA0A8"/>
+</svg>

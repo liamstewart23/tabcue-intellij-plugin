@@ -1,0 +1,18 @@
+.gradle/
+build/
+out/
+.idea/
+.kotlin/
+*.log
+
+# Holds PUBLISH_TOKEN / PRIVATE_KEY_PASSWORD once release signing is set up.
+.env.build
+*.pem
+*.crt
+
+# macOS Finder metadata; this repo goes public.
+.DS_Store
+
+# IntelliJ Platform Gradle Plugin working directory: a full IDE sandbox, downloaded platform
+# artifacts and caches. 8k files / 186MB, all reproducible from the build.
+.intellijPlatform/
