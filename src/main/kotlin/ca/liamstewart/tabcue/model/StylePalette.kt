@@ -70,10 +70,61 @@ object StylePalette {
      * The point is that the common case needs no dialog at all: one click from the context menu.
      * Anything outside this set goes through "Custom Emoji…".
      */
-    val emojis: List<String> = listOf(
-        "🚀", "🔥", "🐛", "🧪", "⚙️", "🌐",
-        "🗄️", "📦", "✅", "⚠️", "🔒", "🧹",
+    data class EmojiChoice(val emoji: String, val displayName: String)
+
+    /**
+     * Named, because a menu row shows the glyph as its icon: with the glyph *also* as the row's
+     * text every entry rendered the same emoji twice, side by side. The name is what makes the
+     * row readable, and it makes the menu searchable by word rather than by pictogram.
+     */
+    val emojiChoices: List<EmojiChoice> = listOf(
+        EmojiChoice("🚀", "Rocket"),
+        EmojiChoice("🔥", "Fire"),
+        EmojiChoice("🐛", "Bug"),
+        EmojiChoice("🧪", "Tests"),
+        EmojiChoice("⚙️", "Build"),
+        EmojiChoice("🌐", "Web"),
+        EmojiChoice("🗄️", "Database"),
+        EmojiChoice("📦", "Package"),
+        EmojiChoice("✅", "Passing"),
+        EmojiChoice("⚠️", "Warning"),
+        EmojiChoice("🔒", "Production"),
+        EmojiChoice("🧹", "Cleanup"),
     )
+
+    /** The glyphs alone, for "is this one of the curated set?" checks and for the rule editor. */
+    val emojis: List<String> = emojiChoices.map { it.emoji }
+
+    data class TextColor(val id: String, val displayName: String, val color: JBColor)
+
+    /**
+     * Tab *label* colours.
+     *
+     * Only two presets, deliberately: against a coloured tab the useful choice is essentially
+     * "light text" or "dark text", and offering ten tints of each would be choice for its own
+     * sake. Anything else goes through Custom, which is the same colour picker the accents use.
+     *
+     * Both are theme-independent — the point of picking one is to override what the theme would
+     * have chosen — so the light and dark values of each JBColor are identical. Black is softened
+     * to 0x1A1A1A because pure black on a mid-tone tab reads as a rendering artefact.
+     */
+    val textColors: List<TextColor> = listOf(
+        TextColor("white", "White", JBColor(0xF2F2F2, 0xF2F2F2)),
+        TextColor("black", "Black", JBColor(0x1A1A1A, 0x1A1A1A)),
+    )
+
+    /** The label colour for a `textColorId`: a preset id, a literal `#RRGGBB`, or null for theme. */
+    fun textColor(id: String?): Color? = when {
+        id == null -> null
+        ColorMath.isCustom(id) -> ColorMath.parseCustom(id)
+        else -> textColors.firstOrNull { it.id == id }?.color
+    }
+
+    fun textColorName(id: String?): String? = when {
+        id == null -> null
+        ColorMath.isCustom(id) -> id
+        else -> textColors.firstOrNull { it.id == id }?.displayName
+    }
 
     /**
      * The accent for a `colorId`, which is either a palette id or a literal `#RRGGBB` chosen from

@@ -26,6 +26,7 @@ class RuleState {
     var colorId: String? = null
     var iconId: String? = null
     var emoji: String? = null
+    var textColorId: String? = null
     var tintBackground: Boolean = false
     var enabled: Boolean = true
 
@@ -44,6 +45,7 @@ class OverrideState {
     var colorId: String? = null
     var iconId: String? = null
     var emoji: String? = null
+    var textColorId: String? = null
     var tintBackground: Boolean = false
 
     /**
@@ -154,6 +156,7 @@ private fun OverrideState.copy(): OverrideState = OverrideState().also {
     it.colorId = colorId
     it.iconId = iconId
     it.emoji = emoji
+    it.textColorId = textColorId
     it.tintBackground = tintBackground
     it.suppressed = suppressed
 }
@@ -256,7 +259,13 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
             StyleRule(
                 field = field,
                 pattern = decodeXmlSafe(raw.pattern).orEmpty(),
-                style = TabStyle(raw.colorId, raw.iconId, raw.tintBackground, decodeXmlSafe(raw.emoji)),
+                style = TabStyle(
+                    colorId = raw.colorId,
+                    iconId = raw.iconId,
+                    tintBackground = raw.tintBackground,
+                    emoji = decodeXmlSafe(raw.emoji),
+                    textColorId = raw.textColorId,
+                ),
                 enabled = raw.enabled,
             )
         }
@@ -272,6 +281,7 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
                 colorId = rule.style.colorId
                 iconId = rule.style.iconId
                 emoji = encodeXmlSafe(rule.style.emoji)
+                textColorId = rule.style.textColorId
                 tintBackground = rule.style.tintBackground
                 enabled = rule.enabled
             }
@@ -295,7 +305,13 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
     fun overrideFor(key: String): TabStyle? {
         val raw = overrides.find(encodeXmlSafe(key) ?: return null) ?: return null
         if (raw.suppressed) return TabStyle.EMPTY
-        return TabStyle(raw.colorId, raw.iconId, raw.tintBackground, decodeXmlSafe(raw.emoji))
+        return TabStyle(
+            colorId = raw.colorId,
+            iconId = raw.iconId,
+            tintBackground = raw.tintBackground,
+            emoji = decodeXmlSafe(raw.emoji),
+            textColorId = raw.textColorId,
+        )
     }
 
     /** True when the user explicitly cleared this tab, which outranks rules and auto-assignment. */
@@ -316,6 +332,7 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
                 colorId = style.colorId
                 iconId = style.iconId
                 emoji = encodeXmlSafe(style.emoji)
+                textColorId = style.textColorId
                 tintBackground = style.tintBackground
             },
         )

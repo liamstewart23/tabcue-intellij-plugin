@@ -201,4 +201,35 @@ class TabStyleStateSerializationTest {
             reloaded.rules.first().field,
         )
     }
+
+    @Test
+    fun `the tab label colour survives a round trip on both rules and overrides`() {
+        // Added after the field itself: a new property on a hand-written state class is exactly
+        // the kind of thing that compiles, runs, and silently drops the value on restart.
+        val rules = roundTrip(
+            TabStyleState().apply {
+                rules.add(
+                    RuleState().apply {
+                        field = MatchField.TAB_TITLE.name
+                        pattern = "prod"
+                        textColorId = "white"
+                    },
+                )
+            },
+        )
+        assertEquals("white", rules.rules.single().textColorId)
+
+        val overrides = roundTrip(
+            TabStyleOverridesState().apply {
+                overrides.add(
+                    OverrideState().apply {
+                        key = "tab"
+                        // A custom colour, since that is the form the picker produces.
+                        textColorId = "#FF8800"
+                    },
+                )
+            },
+        )
+        assertEquals("#FF8800", overrides.overrides.single().textColorId)
+    }
 }

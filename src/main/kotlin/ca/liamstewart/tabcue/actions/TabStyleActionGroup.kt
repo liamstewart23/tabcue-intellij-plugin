@@ -45,8 +45,10 @@ internal class TabStyleActionGroup : DefaultActionGroup(), DumbAware {
             // menu came to 38 items and five separators — around 950px, which scrolls on a 1080p
             // display, and scrolling to reach a colour swatch is the opposite of quick. Grouping
             // also disambiguates the two "Custom…" entries, which read identically side by side.
+            // "Tab Color" rather than "Color" only since "Text Color" joined it: two rows a few
+            // pixels apart, one called "Color", is a coin toss for the reader.
             submenu(
-                "Color",
+                "Tab Color",
                 buildList {
                     add(SetColorAction(null, "No Color", null))
                     StylePalette.colors.forEach { swatch ->
@@ -54,6 +56,19 @@ internal class TabStyleActionGroup : DefaultActionGroup(), DumbAware {
                     }
                     add(Separator.create())
                     add(CustomColorAction())
+                },
+            ),
+            // The label colour, which is the only cue that survives on the *selected* tab: the
+            // platform paints its own background over a selected tab and discards ours.
+            submenu(
+                "Text Color",
+                buildList {
+                    add(SetTextColorAction(null, "Default", null))
+                    StylePalette.textColors.forEach { choice ->
+                        add(SetTextColorAction(choice.id, choice.displayName, ColorIcon(14, choice.color, true)))
+                    }
+                    add(Separator.create())
+                    add(CustomTextColorAction())
                 },
             ),
             submenu(
@@ -70,7 +85,9 @@ internal class TabStyleActionGroup : DefaultActionGroup(), DumbAware {
             submenu(
                 "Emoji",
                 buildList {
-                    StylePalette.emojis.forEach { emoji -> add(SetEmojiAction(emoji)) }
+                    StylePalette.emojiChoices.forEach { choice ->
+                        add(SetEmojiAction(choice.emoji, choice.displayName))
+                    }
                     add(Separator.create())
                     add(CustomEmojiAction())
                 },
@@ -185,6 +202,39 @@ private class CustomColorAction : TabStyleAction("Custom…", null) {
     }
 }
 
+/** A preset label colour, or Default to hand the label back to the theme. */
+private class SetTextColorAction(private val textColorId: String?, text: String, icon: Icon?) :
+    TabStyleAction(text, icon) {
+
+    override fun updateFor(e: AnActionEvent, service: TabStyleService, content: Content) {
+        Toggleable.setSelected(e.presentation, service.manualStyleFor(content).textColorId == textColorId)
+    }
+
+    override fun performOn(e: AnActionEvent, service: TabStyleService, content: Content) {
+        service.setManualStyle(content) { it.copy(textColorId = textColorId) }
+    }
+}
+
+/** Any label colour, through the IDE's own picker. */
+private class CustomTextColorAction : TabStyleAction("Custom…", null) {
+
+    override fun updateFor(e: AnActionEvent, service: TabStyleService, content: Content) {
+        val id = service.manualStyleFor(content).textColorId
+        val custom = id?.takeIf { ColorMath.isCustom(it) }
+        e.presentation.setText(if (custom == null) "Custom…" else "Custom ($custom)…", false)
+        e.presentation.icon = custom?.let { ColorMath.parseCustom(it) }?.let { ColorIcon(14, it, true) }
+        Toggleable.setSelected(e.presentation, custom != null)
+    }
+
+    override fun performOn(e: AnActionEvent, service: TabStyleService, content: Content) {
+        val project = e.project ?: return
+        val current = StylePalette.textColor(service.manualStyleFor(content).textColorId)
+        ColorPickerPopup.show(e, project, current) { picked ->
+            service.setManualStyle(content) { it.copy(textColorId = ColorMath.toColorId(picked)) }
+        }
+    }
+}
+
 private class SetIconAction(private val iconId: String?, text: String, icon: Icon?) :
     TabStyleAction(text, icon) {
 
@@ -200,9 +250,14 @@ private class SetIconAction(private val iconId: String?, text: String, icon: Ico
     }
 }
 
-/** One of the curated emoji, applied directly from the menu. */
-private class SetEmojiAction(private val emoji: String) :
-    TabStyleAction(emoji, EmojiIcon(emoji, size = 13)) {
+/**
+ * One of the curated emoji, applied directly from the menu.
+ *
+ * The row is `[glyph] Name`, not `[glyph] glyph`: passing the emoji as both the icon and the text
+ * drew it twice side by side on every row, which read as a rendering fault rather than a choice.
+ */
+private class SetEmojiAction(private val emoji: String, displayName: String) :
+    TabStyleAction(displayName, EmojiIcon(emoji, size = 13)) {
 
     override fun updateFor(e: AnActionEvent, service: TabStyleService, content: Content) {
         Toggleable.setSelected(e.presentation, service.manualStyleFor(content).emoji == emoji)

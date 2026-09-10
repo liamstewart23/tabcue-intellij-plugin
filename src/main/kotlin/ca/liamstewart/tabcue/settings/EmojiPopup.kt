@@ -6,6 +6,8 @@ import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.components.JBLabel
@@ -83,6 +85,7 @@ internal object EmojiPopup {
             .createComponentPopupBuilder(content, field)
             .setTitle("Tab Emoji")
             .setRequestFocus(true)
+            .setFocusable(true)
             .setMovable(false)
             .setResizable(false)
             .setCancelOnClickOutside(true)
@@ -95,6 +98,18 @@ internal object EmojiPopup {
             popup.closeOk(null)
         }
 
-        popup.showInBestPositionFor(event.dataContext)
+        // Anchored to a point captured *now*, while the menu's data context is still alive. Once
+        // the action returns, the context belongs to a dismissed popup and `showInBestPositionFor`
+        // has nothing useful left to aim at.
+        val point = JBPopupFactory.getInstance().guessBestPopupLocation(event.dataContext)
+
+        // Shown on the next EDT pass rather than immediately. This action runs while the context
+        // menu is still dismissing, and the very mouse event that closes the menu is then
+        // delivered outside the new popup — which, with setCancelOnClickOutside, closed it again
+        // the instant it opened. The symptom is a popup that never appears at all.
+        ApplicationManager.getApplication().invokeLater(
+            { if (!popup.isDisposed) popup.show(point) },
+            ModalityState.any(),
+        )
     }
 }

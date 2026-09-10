@@ -31,10 +31,11 @@ class TabStyleActionGroupTest : BasePlatformTestCase() {
     fun testTheMenuIsGroupedRatherThanOneLongList() {
         val rows = topLevel()
 
-        // Three submenus, a rule/state block and the settings link — short enough that nothing
-        // scrolls at any sane screen height.
+        // Four submenus, a rule/state block and the settings link — short enough that nothing
+        // scrolls at any sane screen height. At exactly the cap: the next addition has to go
+        // inside a submenu rather than onto the top level, which is the point of the assertion.
         assertTrue("top level should stay small, was ${rows.size}", rows.size <= 10)
-        listOf("Color", "Icon", "Emoji").forEach { name ->
+        listOf("Tab Color", "Text Color", "Icon", "Emoji").forEach { name ->
             assertTrue("$name should be a popup submenu", submenu(name).isPopup)
         }
     }
@@ -58,7 +59,7 @@ class TabStyleActionGroupTest : BasePlatformTestCase() {
         // The regression this guards: a "Custom…" for colours and a "Custom…" for emoji sat side by
         // side in the flat menu, indistinguishable. Grouping is what disambiguates them, so the
         // property is worth asserting rather than assuming.
-        (listOf(null) + listOf("Color", "Icon", "Emoji")).forEach { group ->
+        (listOf(null) + listOf("Tab Color", "Text Color", "Icon", "Emoji")).forEach { group ->
             val actions = if (group == null) topLevel() else submenu(group).getChildren(null)
             val labels = actions.filter { it !is Separator }.mapNotNull { it.templatePresentation.text }
             val duplicated = labels.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
@@ -68,7 +69,8 @@ class TabStyleActionGroupTest : BasePlatformTestCase() {
 
     fun testEveryPaletteEntryIsReachable() {
         // Guards against a swatch or emoji being added to the palette but not to the menu.
-        val colors = submenu("Color").getChildren(null)
+        val colors = submenu("Tab Color").getChildren(null)
+        val textColors = submenu("Text Color").getChildren(null)
         val emoji = submenu("Emoji").getChildren(null)
 
         assertEquals(
@@ -81,5 +83,26 @@ class TabStyleActionGroupTest : BasePlatformTestCase() {
             ca.liamstewart.tabcue.model.StylePalette.emojis.size + 1,
             emoji.count { it !is Separator },
         )
+        assertEquals(
+            "every text colour + Default + Custom",
+            ca.liamstewart.tabcue.model.StylePalette.textColors.size + 2,
+            textColors.count { it !is Separator },
+        )
+    }
+
+    fun testEmojiRowsAreNamedRatherThanShowingTheGlyphTwice() {
+        // The regression: SetEmojiAction passed the emoji as both the row's icon and its text, so
+        // every row drew the same glyph side by side. The row text must be a name, never a glyph.
+        val rows = submenu("Emoji").getChildren(null)
+            .filter { it !is Separator }
+            .mapNotNull { it.templatePresentation.text }
+
+        assertTrue("expected emoji rows", rows.isNotEmpty())
+        rows.forEach { text ->
+            assertFalse(
+                "row text should be a name, not the emoji itself: $text",
+                text in ca.liamstewart.tabcue.model.StylePalette.emojis,
+            )
+        }
     }
 }

@@ -55,6 +55,9 @@ object TabStyleApplier {
     /** Whether we currently have a forced background on this tab's editors. */
     private val TINTED = Key.create<Boolean>("TabCue.tinted")
 
+    /** Whether we currently have a forced foreground on this tab's label. */
+    private val TEXT_COLORED = Key.create<Boolean>("TabCue.textColored")
+
     /**
      * An editor's background from before we first touched it.
      *
@@ -105,6 +108,11 @@ object TabStyleApplier {
         // second half matters: skipping this whole block whenever `tintEnabled` was false left the
         // kill switch unable to actually remove an existing tint, so clearing the setting appeared
         // to do nothing until the IDE restarted.
+        // The label is a sibling of the tab content and does not exist until the tool window has
+        // been shown once, so this can legitimately fail on the first attempt — same shape as the
+        // tint, and bounded by the same attempt cap below.
+        val textSettled = applyTextColor(content, style)
+
         val tintSettled = if (wantTint || content.getUserData(TINTED) == true) {
             guarded(LOG, "Background tint unavailable for this tab") {
                 applyBackgroundTint(content, wantTint, style, editors, tintStrength)
@@ -116,7 +124,7 @@ object TabStyleApplier {
         // Only memoise a fully applied result. A tab styled the moment it opens may not have its
         // output editor yet, and caching that partial state would make the early-out above swallow
         // every later retry, leaving the tint permanently unapplied.
-        if (tintSettled) {
+        if (tintSettled && textSettled) {
             content.putUserData(APPLIED, target)
             content.putUserData(TINT_ATTEMPTS, null)
         } else {
@@ -130,6 +138,26 @@ object TabStyleApplier {
                 content.putUserData(APPLIED, target)
             }
         }
+    }
+
+    /**
+     * Returns false when a label colour was wanted but the label could not be found, so it retries.
+     *
+     * The `TEXT_COLORED` marker is what makes clearing work: once the theme default has been
+     * overwritten there is no way to ask the label what it used to be, so the only way back is to
+     * reassign `JBColor.foreground()` — and we must know to do that even though the new style has
+     * no colour of its own.
+     */
+    private fun applyTextColor(content: Content, style: TabStyle): Boolean {
+        val wanted = StylePalette.textColor(style.textColorId)
+        if (wanted == null && content.getUserData(TEXT_COLORED) != true) return true
+
+        val applied = guarded(LOG, "Could not set the tab label colour") {
+            TabLabelFacade.applyTextColor(content, wanted)
+        } ?: false
+
+        if (applied) content.putUserData(TEXT_COLORED, if (wanted != null) true else null)
+        return applied
     }
 
     private fun applyIcon(content: Content, style: TabStyle, colorAsDot: Boolean) {
