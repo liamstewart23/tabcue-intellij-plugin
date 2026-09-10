@@ -7,7 +7,7 @@ import java.awt.image.BufferedImage
  * Guards the icons this plugin draws itself.
  *
  * These are painted with raw `Graphics2D`, so a mistake shows up as an invisible icon rather than
- * an exception — the tab would just look unstyled. Rendering into a [BufferedImage] and counting
+ * an exception; the tab would just look unstyled. Rendering into a [BufferedImage] and counting
  * non-transparent pixels catches that headlessly.
  */
 class TabIconsTest : BasePlatformTestCase() {
@@ -39,7 +39,7 @@ class TabIconsTest : BasePlatformTestCase() {
     }
 
     fun testEmojiIconPaintsASupplementaryPlaneEmoji() {
-        // U+1F680, a surrogate pair — the case most likely to render as nothing.
+        // U+1F680, a surrogate pair, the case most likely to render as nothing.
         assertTrue("🚀 must draw something", paintedPixels(EmojiIcon("🚀")) > 0)
     }
 
@@ -60,7 +60,7 @@ class TabIconsTest : BasePlatformTestCase() {
 
     fun testIconsCompareByValueSoUnchangedRestylesFireNoEvents() {
         // ContentImpl.setIcon fires a property change only when the value differs, so equality has
-        // to be structural — a fresh instance per restyle would otherwise relayout the tab strip.
+        // to be structural, or a fresh instance per restyle would relayout the tab strip.
         assertEquals(EmojiIcon("🚀"), EmojiIcon("🚀"))
         assertEquals(DotIcon(StylePalette.color("red")!!), DotIcon(StylePalette.color("red")!!))
         assertFalse(EmojiIcon("🚀") == EmojiIcon("🔥"))

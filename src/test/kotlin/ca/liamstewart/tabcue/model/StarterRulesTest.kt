@@ -11,7 +11,7 @@ import org.junit.Test
  *
  * These are the only rules most users will ever see, they are written by hand, and every way of
  * getting them wrong fails silently rather than loudly: an unresolvable colour id degrades to "no
- * colour", and a rule whose style is empty is skipped by [RuleMatcher] — which also swallows every
+ * colour", and a rule whose style is empty is skipped by [RuleMatcher], which also swallows every
  * rule after it, since matching is first-match-wins.
  */
 class StarterRulesTest {

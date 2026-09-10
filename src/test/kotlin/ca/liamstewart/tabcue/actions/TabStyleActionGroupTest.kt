@@ -9,7 +9,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 /**
  * Pins the shape of the right-click menu.
  *
- * Flat, this menu reached 38 items and five separators — roughly 950px, which scrolls on a 1080p
+ * Flat, this menu reached 38 items and five separators, roughly 950px, which scrolls on a 1080p
  * display. The structure is therefore load-bearing UX, not incidental, and it is the kind of thing
  * that regresses silently as swatches and emoji are added.
  *
@@ -31,7 +31,7 @@ class TabStyleActionGroupTest : BasePlatformTestCase() {
     fun testTheMenuIsGroupedRatherThanOneLongList() {
         val rows = topLevel()
 
-        // Four submenus, a rule/state block and the settings link — short enough that nothing
+        // Four submenus, a rule/state block and the settings link, short enough that nothing
         // scrolls at any sane screen height. At exactly the cap: the next addition has to go
         // inside a submenu rather than onto the top level, which is the point of the assertion.
         assertTrue("top level should stay small, was ${rows.size}", rows.size <= 10)

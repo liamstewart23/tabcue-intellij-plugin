@@ -16,7 +16,7 @@ import javax.swing.JPanel
  *
  * This covers what neither the pure unit tests nor a GUI smoke test reach: service instantiation,
  * listener installation, and the full precedence chain (suppressed → manual → rule → auto) with
- * real persistence behind it. There is no terminal here, so tabs resolve no working directory —
+ * real persistence behind it. There is no terminal here, so tabs resolve no working directory,
  * which is exactly the fallback path worth exercising.
  */
 class TabStyleServiceTest : BasePlatformTestCase() {
@@ -147,8 +147,9 @@ class TabStyleServiceTest : BasePlatformTestCase() {
 
     fun testStyleKeyResolutionHasNoSideEffectOnRepeatedCalls() {
         val content = newContent("bash")
-        // Called from action update() while the menu is built, so it must be pure — pinning there
-        // would freeze the tab's identity at whatever the shell reported at that moment.
+        // Called from action update() while the menu is built, so repeated calls must agree. It
+        // pins the discriminator but never the key itself, which would freeze the tab's identity
+        // at whatever the shell reported at that moment.
         val first = service.styleKeyFor(content)
         val second = service.styleKeyFor(content)
         assertEquals(first, second)
@@ -213,7 +214,7 @@ class TabStyleServiceTest : BasePlatformTestCase() {
         service.restyle(content)
         assertSame("an unstyled tab must not lose a foreign icon", foreign, content.icon)
 
-        // An explicit choice does replace it — the user asked for that.
+        // An explicit choice does replace it, because the user asked for that.
         service.setManualStyle(content) { it.copy(emoji = "\uD83D\uDE80") }
         assertNotSame(foreign, content.icon)
 
@@ -231,7 +232,7 @@ class TabStyleServiceTest : BasePlatformTestCase() {
         // The property worth pinning is that the colour is a pure function of the tab's identity,
         // not of how many tabs were styled before it. Previously it was "the first palette entry
         // no sibling is using", so reopening a project handed every terminal a different colour
-        // than the day before — which teaches you to stop reading the colours.
+        // than the day before, which teaches you to stop reading the colours.
         //
         // String.hashCode is specified by the JDK, so this expectation is stable across JVMs and
         // machines, which is exactly the guarantee being claimed.
@@ -243,5 +244,42 @@ class TabStyleServiceTest : BasePlatformTestCase() {
             ColorMath.tabFill(StylePalette.color(expected)!!),
             content.tabColor,
         )
+    }
+
+    fun testSavedStateIsASnapshotRatherThanTheLiveOne() {
+        // getState() is called on a background save thread while Apply can be replacing the rule
+        // list on the EDT. Handing out the live object also let a caller mutate settings without
+        // going through setRules.
+        settings.setRules(
+            listOf(
+                StyleRule(MatchField.TAB_TITLE, "one", TabStyle(colorId = "red")),
+            ),
+        )
+        val saved = settings.state
+
+        saved.rules.clear()
+        saved.autoAssignColors = true
+
+        assertEquals("the service should be unaffected", 1, settings.rules().size)
+        assertFalse("the service should be unaffected", settings.autoAssignColors)
+    }
+
+    fun testStarterRulesArriveOnceAndStayDeleted() {
+        // The two halves of the promise: a fresh project gets the agent rules, and deleting them
+        // is permanent. Getting the second wrong would re-add them on every project open, which is
+        // the most annoying possible behaviour.
+        val saved = settings.state
+        try {
+            settings.loadState(ca.liamstewart.tabcue.settings.TabStyleState())
+            assertFalse("a fresh project should get starter rules", settings.rules().isEmpty())
+
+            settings.loadState(
+                ca.liamstewart.tabcue.settings.TabStyleState().apply { seededStarterRules = true },
+            )
+            assertTrue("deleted starter rules must not come back", settings.rules().isEmpty())
+        } finally {
+            // Restored, because the project is shared across the methods in this class.
+            settings.loadState(saved)
+        }
     }
 }

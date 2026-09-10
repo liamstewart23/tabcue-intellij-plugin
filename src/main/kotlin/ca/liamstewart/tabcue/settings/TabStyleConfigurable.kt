@@ -17,7 +17,7 @@ import javax.swing.JSlider
 /** Settings ▸ Tools ▸ TabCue. */
 internal class TabStyleConfigurable(private val project: Project) : SearchableConfigurable {
 
-    private val autoAssign = JBCheckBox("Give each new terminal tab a different color automatically")
+    private val autoAssign = JBCheckBox("Give each terminal tab its own color automatically")
     private val showColorAsDot = JBCheckBox("Also show the tab color as a dot icon")
     private val allowTint = JBCheckBox("Allow tinting the terminal background (uses internal APIs)")
     private val tintStrengthValue = JBLabel()
@@ -75,7 +75,14 @@ internal class TabStyleConfigurable(private val project: Project) : SearchableCo
 
         return panel {
             group("Tabs") {
-                row { cell(autoAssign) }
+                row {
+                    cell(autoAssign)
+                        .comment(
+                            "The color comes from the tab's own name and directory, so a tab " +
+                                "keeps the same one after a restart. Rules and colors you set by " +
+                                "hand always win."
+                        )
+                }
                 row {
                     cell(showColorAsDot)
                         .comment(
@@ -206,6 +213,9 @@ private object StyleColumn : ColumnInfo<StyleRule, String>("Style") {
         val parts = buildList {
             item.style.emoji?.takeIf { it.isNotBlank() }?.let { add(it) }
             StylePalette.colorName(item.style.colorId)?.let { add(it) }
+            // Labelled, so it cannot be mistaken for the tab colour beside it. Without this a
+            // rule that only sets a text colour read as "None" while working perfectly well.
+            StylePalette.textColorName(item.style.textColorId)?.let { add("$it text") }
             item.style.iconId?.let { id ->
                 StylePalette.icons.firstOrNull { it.id == id }?.displayName?.let { add("$it icon") }
             }

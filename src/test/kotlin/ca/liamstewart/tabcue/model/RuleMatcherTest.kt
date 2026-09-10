@@ -98,7 +98,7 @@ class RuleMatcherTest {
 
     @Test(timeout = 3000)
     fun `a wildcard heavy pattern under the cap still completes instantly`() {
-        // 20 nested wildcards, 41 characters — comfortably under MAX_PATTERN_LENGTH, so the length
+        // 20 nested wildcards, 41 characters, comfortably under MAX_PATTERN_LENGTH, so the length
         // guard does not save us here. Compiled to a regex this is the textbook catastrophic
         // backtracking shape and would hang the EDT; the two-pointer scan is linear.
         val pattern = "*a".repeat(20) + "b"

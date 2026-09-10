@@ -102,8 +102,8 @@ class TabStyleState {
     /**
      * Where per-tab overrides lived before they moved to the workspace file.
      *
-     * Retained purely so styles set by an earlier build are migrated rather than silently dropped
-     * The element name matches what that build wrote. Emptied on first access.
+     * Retained so styles set by an earlier build are migrated rather than silently dropped. The
+     * element name matches what that build wrote. Emptied on first access.
      */
     @get:XCollection(propertyElementName = "overrides")
     var legacyOverrides: MutableList<OverrideState> = mutableListOf()
@@ -160,6 +160,18 @@ class TabStyleOverrides : PersistentStateComponent<TabStyleOverridesState> {
     }
 }
 
+private fun RuleState.copy(): RuleState = RuleState().also {
+    it.field = field
+    it.pattern = pattern
+    it.colorId = colorId
+    it.iconId = iconId
+    it.emoji = emoji
+    it.textColorId = textColorId
+    it.tintBackground = tintBackground
+    it.enabled = enabled
+    it.order = order
+}
+
 private fun OverrideState.copy(): OverrideState = OverrideState().also {
     it.key = key
     it.colorId = colorId
@@ -174,6 +186,7 @@ private fun OverrideState.copy(): OverrideState = OverrideState().also {
 @State(name = "TerminalTabStyle", storages = [Storage("terminalTabStyle.xml")])
 class TabStyleSettings(private val project: Project) : PersistentStateComponent<TabStyleState> {
 
+    @Volatile
     private var state = TabStyleState()
 
     /** Rebuilt only when the rules change; [rules] is called on every terminal title change. */
@@ -204,7 +217,19 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
             return store
         }
 
-    override fun getState(): TabStyleState = state
+    // A copy, for the same reason TabStyleOverrides makes one: the serialiser walks this on a
+    // background save thread while the EDT may be replacing the rule list from Apply.
+    override fun getState(): TabStyleState = TabStyleState().also { copy ->
+        val live = state
+        copy.autoAssignColors = live.autoAssignColors
+        copy.allowBackgroundTint = live.allowBackgroundTint
+        copy.showColorAsDot = live.showColorAsDot
+        copy.tintStrength = live.tintStrength
+        copy.seededStarterRules = live.seededStarterRules
+        copy.rules = live.rules.mapTo(mutableListOf()) { it.copy() }
+        copy.unknownRules = live.unknownRules.mapTo(mutableListOf()) { it.copy() }
+        copy.legacyOverrides = live.legacyOverrides.mapTo(mutableListOf()) { it.copy() }
+    }
 
     override fun loadState(loaded: TabStyleState) {
         state = loaded

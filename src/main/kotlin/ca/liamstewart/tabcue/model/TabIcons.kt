@@ -91,8 +91,6 @@ class EmojiIcon(text: String, private val size: Int = 14) : Icon {
     private companion object {
         private val cache = java.util.concurrent.ConcurrentHashMap<Int, Font>()
 
-
-
         /**
          * Prefers Apple Color Emoji, but verifies it can actually render the glyph.
          *

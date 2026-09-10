@@ -9,7 +9,7 @@ import org.junit.Test
  * The settings XML mangles two classes of character, and both reach it through user-visible fields.
  *
  * Above-BMP characters are surrogate pairs in a Java `String`, and a per-`char` validity check
- * strips each half as a lone surrogate — the value returns empty with no error. Control characters
+ * strips each half as a lone surrogate, so the value returns empty with no error. Control characters
  * are illegal in XML 1.0 outright and a shell can emit one inside an OSC title, which ends up in a
  * style key. This affects emoji, rule patterns and tab-identity keys alike.
  */

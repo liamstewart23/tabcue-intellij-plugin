@@ -18,7 +18,7 @@ import javax.swing.JPanel
  *
  * This is the assertion that matters most in the project. `Content.setTabColor` / `getTabColor` are
  * declared as **no-op `default` methods** on the interface and only do anything on `ContentImpl`,
- * so a round-trip through a factory-built content is what proves the mechanism actually holds —
+ * so a round-trip through a factory-built content is what proves the mechanism actually holds,
  * and it would catch the platform quietly dropping the API in a future release.
  */
 class TabStyleApplierTest : BasePlatformTestCase() {
@@ -61,7 +61,7 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         applyStyle(content, TabStyle(colorId = "#3B7DD8"))
 
         // A picked colour travels in the same colorId field as a palette id, so it must reach the
-        // painter by exactly the same path — including the derivation and the compensation.
+        // painter by exactly the same path, including the derivation and the compensation.
         assertEquals(ColorMath.tabFill(java.awt.Color(0x3B, 0x7D, 0xD8)), content.tabColor)
     }
 
@@ -89,7 +89,7 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         val content = newContent()
         val seen = mutableListOf<String>()
         // BaseLabel reads SHOW_CONTENT_ICON while handling the icon property change, so the flag
-        // has to already be true by then — otherwise the icon only shows on a later tab update,
+        // has to already be true by then, or the icon only shows on a later tab update,
         // which showed up as "the icon appears only once you click the tab".
         content.addPropertyChangeListener { event ->
             if (event.propertyName == Content.PROP_ICON) {
@@ -135,7 +135,7 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         val content = newContent()
 
         // Documents why there is no "force the tab strip" workaround. TabContentLayout hides the
-        // strip for a lone tab only when getToolwindowTitle() is blank — but ContentImpl falls back
+        // strip for a lone tab only when getToolwindowTitle() is blank, but ContentImpl falls back
         // to the display name, which the terminal always sets. So the condition cannot trigger, and
         // any code forcing a title would be dead weight that also stops the header tracking renames.
         assertFalse(
@@ -152,7 +152,7 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         var events = 0
         content.addPropertyChangeListener { events++ }
         // The service re-resolves on every terminal title change, so an unchanged result must be a
-        // no-op — otherwise every shell prompt would trigger a relayout and a Swing tree walk.
+        // no-op, or every shell prompt would trigger a relayout and a Swing tree walk.
         repeat(5) { applyStyle(content, TabStyle(colorId = "red"), colorAsDot = true) }
 
         assertEquals("unchanged re-apply must not touch the content", 0, events)
@@ -185,8 +185,8 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         val content = newContent()
 
         // A plain JPanel has no terminal editor, so the tint cannot land. The change-detection
-        // cache must not record this as done, or the retry on the next tick — and every later
-        // title change — would be skipped and the tint would never appear.
+        // cache must not record this as done, or the retry on the next tick, and every later
+        // title change, would be skipped and the tint would never appear.
         TabStyleApplier.apply(
             content = content,
             style = TabStyle(colorId = "red", tintBackground = true),

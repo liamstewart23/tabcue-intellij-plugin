@@ -20,31 +20,27 @@ import javax.swing.Icon
 /**
  * Writes a [TabStyle] onto a tab's [Content].
  *
- * Everything here except the background tint is supported platform API. `ContentImpl.setTabColor`
- * fires `PROP_TAB_COLOR`, which `ToolWindowContentUi`'s property listener turns into a relayout, so
- * there is no need to repaint anything by hand.
+ * Everything except the background tint is supported platform API. `setTabColor` fires
+ * `PROP_TAB_COLOR`, which the platform turns into a relayout, so nothing here repaints by hand.
  */
 object TabStyleApplier {
 
     private val LOG = logger<TabStyleApplier>()
 
     /**
-     * Everything that affects the rendered result.
+     * Everything that affects the rendered result, compared before doing any work.
      *
-     * Compared before doing any work: [TabStyleService] re-resolves on every terminal title change,
-     * which for a shell that reports its title per prompt means many times a minute. Without this
-     * guard each of those would walk the tab's whole Swing tree looking for the output editor and
-     * re-fire property changes that cause a relayout.
+     * [TabStyleService] re-resolves on every terminal title change, which for a shell reporting
+     * its title per prompt is many times a minute. Each one would otherwise walk the tab's Swing
+     * tree for the output editor and re-fire property changes that cause a relayout.
      */
     private data class Applied(
         val style: TabStyle,
         val colorAsDot: Boolean,
         val tintEnabled: Boolean,
         /**
-         * How many output editors the tab had.
-         *
-         * Splitting a tinted tab adds a pane without changing any of the fields above, so without
-         * this the early-out would skip the new pane and leave the tab half tinted.
+         * How many output editors the tab had. Splitting a tinted tab adds a pane without
+         * changing anything above, and the early-out would leave the new pane untinted.
          */
         val editorCount: Int,
         /** Included so changing the strength in settings actually repaints. */
@@ -66,11 +62,9 @@ object TabStyleApplier {
     private val FOREIGN_ICON = Key.create<Icon>("TabCue.foreignIcon")
 
     /**
-     * An editor's background from before we first touched it.
-     *
-     * Captured per editor rather than re-derived from the global scheme: the terminal may paint a
-     * console background that differs from the editor default, and restoring the wrong one would
-     * leave a permanently mis-coloured pane after the tint was switched off.
+     * An editor's background from before we first touched it. Captured per editor rather than
+     * re-derived from the scheme, since the terminal may paint a console background of its own and
+     * restoring the wrong one leaves a permanently mis-coloured pane.
      */
     private val PRE_TINT_BACKGROUND = Key.create<Color>("TabCue.preTintBackground")
 
@@ -88,10 +82,9 @@ object TabStyleApplier {
         colorAsDot: Boolean,
         tintStrength: Int,
     ) {
-        // Ahead of the memo, because the platform resets the label colour behind our back:
-        // BaseLabel.updateUI does it on any LaF change, and a rebuilt tool window makes a fresh
-        // label. Neither invalidates the memo. Cheap enough to repeat: the label is cached, and
-        // nothing is written unless the colour actually differs.
+        // Ahead of the memo, because the platform resets the label colour behind our back and
+        // neither a LaF change nor a rebuilt tool window invalidates the memo. Cheap to repeat:
+        // the label is cached and nothing is written unless the colour differs.
         val textSettled = applyTextColor(content, style)
 
         val wantTint = tintEnabled && style.tintBackground
@@ -113,10 +106,9 @@ object TabStyleApplier {
         runCatching { applyIcon(content, style, colorAsDot) }
             .onFailure { LOG.warn("Could not set tab icon", it) }
 
-        // Last, and swallowed: the tint is the one unsupported channel, and a failure here must not
-        // cost the user their colour and icon. Entered when a tint is wanted or when one is
-        // already applied and has to come off, so that switching the setting off can actually
-        // remove it.
+        // Last and swallowed: the tint is the one unsupported channel, and failing here must not
+        // cost the user their colour and icon. Also entered when a tint is already applied and has
+        // to come off, so switching the setting off can actually remove it.
         val tintSettled = if (wantTint || content.getUserData(TINTED) == true) {
             guarded(LOG, "Background tint unavailable for this tab") {
                 applyBackgroundTint(content, wantTint, style, editors, tintStrength)
@@ -125,15 +117,13 @@ object TabStyleApplier {
             true
         }
 
-        // Only memoise a fully applied result. A tab styled the moment it opens may not have its
-        // output editor yet, and caching that partial state would make the early-out above swallow
-        // every later retry, leaving the tint permanently unapplied.
+        // Only memoise a fully applied result: a tab styled the moment it opens may not have its
+        // output editor yet, and caching that would make the early-out swallow every later retry.
         if (tintSettled && textSettled) {
             content.putUserData(APPLIED, target)
             content.putUserData(SETTLE_ATTEMPTS, null)
         } else {
-            // Not memoising is what allows a retry, but with no limit a tab whose editor never
-            // appears would search on every shell prompt forever.
+            // Bounded, or a tab whose editor never appears retries on every shell prompt forever.
             val attempts = (content.getUserData(SETTLE_ATTEMPTS) ?: 0) + 1
             content.putUserData(SETTLE_ATTEMPTS, attempts)
             if (attempts >= MAX_SETTLE_ATTEMPTS) {
@@ -146,10 +136,9 @@ object TabStyleApplier {
     /**
      * Returns false when a label colour was wanted but the label could not be found, so it retries.
      *
-     * The `TEXT_COLORED` marker is what makes clearing work: once the theme default has been
-     * overwritten there is no way to ask the label what it used to be, so the only way back is to
-     * reassign `JBColor.foreground()`, and we must know to do that even though the new style has
-     * no colour of its own.
+     * The marker is what makes clearing work: the label cannot say what colour it used to have, so
+     * the only way back is to reassign the theme's, and we have to know to do that for a style
+     * that has no colour of its own.
      */
     private fun applyTextColor(content: Content, style: TabStyle): Boolean {
         val wanted = StylePalette.textColor(style.textColorId)
@@ -164,21 +153,18 @@ object TabStyleApplier {
     }
 
     /**
-     * Sets the tab icon, without destroying an icon somebody else owns.
+     * Sets the tab icon without destroying an icon somebody else owns.
      *
-     * PhpStorm 2026.2 made this matter. Its "AI Agents" terminal feature sets an agent logo with
-     * exactly the two calls used here, `putUserData(SHOW_CONTENT_ICON, true)` and
-     * `content.icon = agent.icon`, on tabs it launches (Codex and Junie today; Claude Code
-     * declares `showIconInTab = false`). Since this runs on every terminal tab, styled or not, an
-     * unconditional `content.icon = null` silently wiped that logo the first time we touched the
-     * tab. So: only ever clear an icon we set, and put back whatever was there before we did.
+     * PhpStorm 2026.2's "AI Agents" feature marks the tabs it launches using the same two calls
+     * used here. Since every terminal tab is restyled whether or not it has a style, clearing
+     * unconditionally wiped that icon. So only icons we set are cleared, and the previous one is
+     * put back.
      */
     private fun applyIcon(content: Content, style: TabStyle, colorAsDot: Boolean) {
         val icon = StylePalette.iconFor(style, colorAsDot)
         val owned = content.getUserData(ICON_OWNED) == true
 
         if (icon == null) {
-            // Nothing of ours on this tab: leave it exactly as we found it.
             if (!owned) return
             val restored = content.getUserData(FOREIGN_ICON)
             content.putUserData(ToolWindow.SHOW_CONTENT_ICON, if (restored != null) true else null)
@@ -196,11 +182,9 @@ object TabStyleApplier {
         // of our own icons for the platform's.
         if (!owned) content.putUserData(FOREIGN_ICON, quietly { content.icon })
 
-        // Order is load-bearing. `BaseLabel.updateTextAndIcon` reads both flags below while it
-        // handles the PROP_ICON change, and writing user data fires no event of its own. Setting
-        // the icon *last* is therefore what makes it appear immediately; with the icon set first
-        // the label would refresh before the flags were true and only pick the icon up on the next
-        // unrelated tab update, which is why it previously took a click on the tab to show up.
+        // Order is load-bearing. The label reads both flags below while handling the icon change,
+        // and writing user data fires no event, so setting the icon last is what makes it appear
+        // immediately. The other way round it took a click on the tab to show up.
         content.putUserData(ToolWindow.SHOW_CONTENT_ICON, true)
         // Without this, unselected tabs render the icon at 50% alpha as a WatermarkIcon.
         content.putUserData(ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT, false)
@@ -247,10 +231,9 @@ object TabStyleApplier {
     }
 
     /**
-     * Removes everything this plugin set, leaving no trace on the [Content].
-     *
-     * Used both for "Clear Style" and on plugin unload, where any remaining user data would keep
-     * plugin-loaded classes (our icons) reachable and block the classloader from being collected.
+     * Removes everything this plugin set, leaving no trace on the [Content]. Used for "Clear
+     * Style" and on unload, where leftover user data keeps our icon classes reachable and stops
+     * the plugin classloader being collected.
      */
     fun reset(content: Content) {
         apply(
