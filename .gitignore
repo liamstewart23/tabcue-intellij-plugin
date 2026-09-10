@@ -13,6 +13,10 @@ out/
 # macOS Finder metadata; this repo goes public.
 .DS_Store
 
+# Marketplace-sized (1280x800) screenshots, regenerated from marketing/screenshots/*.png by
+# marketing/screenshots/normalise.sh. Only needed transiently for the upload itself.
+marketing/screenshots/store/
+
 # IntelliJ Platform Gradle Plugin working directory: a full IDE sandbox, downloaded platform
 # artifacts and caches. 8k files / 186MB, all reproducible from the build.
 .intellijPlatform/

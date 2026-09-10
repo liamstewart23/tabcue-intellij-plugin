@@ -12,7 +12,6 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.util.xmlb.annotations.Tag
 import com.intellij.util.xmlb.annotations.XCollection
 import ca.liamstewart.tabcue.model.MatchField
-import ca.liamstewart.tabcue.model.StarterRules
 import ca.liamstewart.tabcue.model.StyleRule
 import ca.liamstewart.tabcue.model.TabStyle
 
@@ -82,13 +81,8 @@ class TabStyleState {
     @get:XCollection(propertyElementName = "rules")
     var rules: MutableList<RuleState> = mutableListOf()
 
-    /**
-     * Whether the AI-agent starter rules have already been offered to this project.
-     *
-     * Separate from "the rule list is empty" so that deleting them sticks: without the flag, the
-     * next project open would helpfully put them all back.
-     */
-    var seededStarterRules: Boolean = false
+    /** Whether the first-run defaults have already been applied. See `seedDefaultsOnce`. */
+    var seededDefaults: Boolean = false
 
     /**
      * Rules whose `field` this build does not recognise, kept verbatim.
@@ -225,7 +219,7 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
         copy.allowBackgroundTint = live.allowBackgroundTint
         copy.showColorAsDot = live.showColorAsDot
         copy.tintStrength = live.tintStrength
-        copy.seededStarterRules = live.seededStarterRules
+        copy.seededDefaults = live.seededDefaults
         copy.rules = live.rules.mapTo(mutableListOf()) { it.copy() }
         copy.unknownRules = live.unknownRules.mapTo(mutableListOf()) { it.copy() }
         copy.legacyOverrides = live.legacyOverrides.mapTo(mutableListOf()) { it.copy() }
@@ -248,30 +242,31 @@ class TabStyleSettings(private val project: Project) : PersistentStateComponent<
             }
             state.unknownRules = mutableListOf()
         }
-        seedStarterRulesIfUntouched()
+        // Deliberately does not seed: a project with a stored file is not a fresh install, and an
+        // upgrade switching a visual behaviour on is the worse surprise.
         cachedRules = null
     }
 
     /**
-     * Called instead of [loadState] when the project has no stored settings at all, a genuinely
-     * fresh install, which is the main case the starter rules exist for.
+     * Called instead of [loadState] when the project has no stored settings at all, which is the
+     * only case the first-run defaults are meant for.
      */
     override fun noStateLoaded() {
-        seedStarterRulesIfUntouched()
+        seedDefaultsOnce()
         cachedRules = null
     }
 
     /**
-     * Adds the agent starter rules, once, and only to a project that has no rules of its own.
+     * Turns auto colours on, once, so a fresh install does something before it is configured.
      *
-     * The flag is set even when nothing is added, so a project that already had rules is not
-     * re-examined every time it opens. Reaches for no other service, which is what `loadState`
-     * requires of anything it calls.
+     * The flag is what keeps it once-only. Switching auto colours back off leaves a state equal to
+     * the field defaults, which the serialiser can write as nothing at all, and the next project
+     * open would then look like a fresh install again.
      */
-    private fun seedStarterRulesIfUntouched() {
-        if (state.seededStarterRules) return
-        state.seededStarterRules = true
-        if (state.rules.isEmpty()) setRules(StarterRules.agentRules())
+    private fun seedDefaultsOnce() {
+        if (state.seededDefaults) return
+        state.seededDefaults = true
+        state.autoAssignColors = true
     }
 
     /** The [parent] disposable is required so a dynamic plugin reload cannot double-register. */

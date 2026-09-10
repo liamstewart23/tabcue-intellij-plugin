@@ -37,11 +37,10 @@ First release.
   it, so clearing a tab is not immediately repainted by a matching rule.
 - *Configure Rules…* in the tab menu, and a settings page under *Tools ▸ TabCue* that is findable
   from Settings search.
-- **Starter rules for AI agents.** A project with no rules of its own begins with one rule each
-  for Claude Code, Codex, Junie and aider, each a distinct colour *and* a distinct emoji, since
-  the case they exist for is three agent tabs open at once. Matching is on the tab title, which the terminal
-  keeps in sync with the shell's title, so they fire whether the IDE launched the agent or you
-  typed the command. Seeded once and only into an empty rule list, so deleting them sticks.
+- **Auto-assigned colours are on for a fresh install**, so the plugin does something visible
+  before it is configured. No rules are invented: guessing which tools you run means naming
+  vendors, picking colours that only look like brand colours, and replacing icons the IDE set
+  itself. Seeded once, so switching it off sticks.
 - **Per-tab text colour.** White, black or custom, from the *Text Color* submenu. This is the
   only cue that survives selection: `JBDefaultTabPainter.getCustomBackground` does not blend a
   custom tab colour when the tab is selected, it discards it and substitutes a theme colour.
@@ -71,6 +70,11 @@ First release.
 - Asking for a tab's identity no longer performs a reflective terminal lookup and a shell
   working-directory query when the answer is already pinned, which it is for any tab styled by
   hand. It was being asked once per menu item.
+- Colours and icons in the rule editor and in the rules list are shown, not just named. Each
+  dropdown row carries the colour or icon it stands for, and the rules list carries the rule's own
+  colour, matching the tab menu, which had been the only place a colour was actually drawn.
+  *Custom…* shows its swatch button only while it is selected: a greyed-out swatch sitting beside a
+  dropdown that reads *Teal* is simply wrong.
 
 ### Hardened
 
@@ -79,7 +83,15 @@ First release.
   `putUserData(SHOW_CONTENT_ICON, true)` and `content.icon = …`. Since every terminal tab is
   restyled whether or not it has a style, clearing unconditionally would wipe that logo the moment
   a tab was touched. Only icons this plugin set are cleared, and whatever was there beforehand is
-  restored when a style is removed.
+  restored when a style is removed. The colour dot goes further and yields entirely: it is only
+  this plugin's stand-in for the tab colour, so it never replaces a real icon, while an emoji or
+  an icon chosen by hand still does. Ownership is checked against the icon actually on the tab,
+  because the IDE brands an agent tab moments after creating it, which is after the first restyle.
+- A tab's text colour survives switching tabs. `ContentTabLabel.update` reassigns both of
+  `BaseLabel`'s foreground fields from the theme, and the platform calls it for every tab whenever
+  the selection changes, so a colour set by hand was gone on the next click. The colour is now put
+  back while the label paints, which is the last point it can be restored without a second repaint,
+  so there is no flicker.
 - The tab fill resolves lazily, so it follows a theme switch instead of freezing at whatever theme
   was in force when the tab was styled. It is memoised on the theme values it derives from,
   because `JBColor` calls its supplier on every channel read.

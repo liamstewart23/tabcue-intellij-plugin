@@ -33,6 +33,9 @@ import java.util.concurrent.ConcurrentHashMap
 /** A tab's pinned discriminator, with the base key it was computed for. */
 private class PinnedIndex(val base: String, val index: Int)
 
+/** A tab's pinned auto colour, with the key it was derived from. */
+private class PinnedColor(val key: String, val colorId: String)
+
 /**
  * Owns tab styling for one project: watches for new tabs, decides what style each should get, and
  * keeps that style correct as tabs are renamed or settings change.
@@ -309,7 +312,7 @@ class TabStyleService(val project: Project) : Disposable {
         val base = when {
             userDefined != null -> "name:$userDefined"
             cwd != null -> "cwd:$cwd"
-            else -> "tab:${tabLabel(content) ?: "terminal"}"
+            else -> FALLBACK_KEY_PREFIX + (tabLabel(content) ?: "terminal")
         }
 
         // Applied to every key shape, not just directories: tabs can equally share a fallback
@@ -368,19 +371,19 @@ class TabStyleService(val project: Project) : Disposable {
      * Derived from [key], the tab's title and working directory, rather than handed out in the
      * order tabs open, so the colour survives a restart. `String.hashCode` is JDK-specified rather
      * than an implementation detail. Distinctness still wins: the hash only picks where to start
-     * looking, and a sibling's colour is skipped.
-     *
-     * Pinned on first use, since this is re-resolved on every title change while the sibling set
-     * changes.
+     * looking, and a sibling's colour is skipped. Pinned, because this is re-resolved on every
+     * title change while the sibling set changes.
      */
     private fun autoColorFor(content: Content, key: String): String {
-        content.getUserData(AUTO_COLOR)?.let { return it }
+        content.getUserData(AUTO_COLOR)?.let { pinned ->
+            if (!shouldRederive(pinned.key, key)) return pinned.colorId
+        }
 
         val others = siblingsOf(content)
         // Colours from rules and manual overrides count as taken too, or an auto tab would happily
         // duplicate a rule's red while most of the palette sat unused.
         val inUse = others.flatMap { other ->
-            listOfNotNull(other.getUserData(AUTO_COLOR), TabStyleApplier.appliedStyle(other)?.colorId)
+            listOfNotNull(other.getUserData(AUTO_COLOR)?.colorId, TabStyleApplier.appliedStyle(other)?.colorId)
         }.toSet()
 
         val start = key.hashCode().mod(StylePalette.colors.size)
@@ -391,7 +394,7 @@ class TabStyleService(val project: Project) : Disposable {
             // unavoidable. Repeat this tab's own colour rather than an arbitrary one.
             ?: StylePalette.colorIdAt(start)
 
-        content.putUserData(AUTO_COLOR, chosen)
+        content.putUserData(AUTO_COLOR, PinnedColor(key, chosen))
         return chosen
     }
 
@@ -496,7 +499,22 @@ class TabStyleService(val project: Project) : Disposable {
         private val STYLE_KEY = Key.create<String>("TabCue.key")
 
         /** A tab's pinned auto-assigned colour, so it stays put for the tab's lifetime. */
-        private val AUTO_COLOR = Key.create<String>("TabCue.autoColor")
+        private val AUTO_COLOR = Key.create<PinnedColor>("TabCue.autoColor")
+
+        /** The weakest key shape, used until the terminal reports a name or a directory. */
+        private const val FALLBACK_KEY_PREFIX = "tab:"
+
+        /**
+         * Whether a pinned auto colour should be recomputed for [key].
+         *
+         * A tab's first restyle runs before the terminal has reported anything, so a colour pinned
+         * then follows the tab's position in the strip rather than the tab. Re-derived exactly
+         * once, when the identity firms up, so a shell that changes directory keeps its colour.
+         */
+        internal fun shouldRederive(pinnedKey: String, key: String): Boolean =
+            pinnedKey.isProvisional() && !key.isProvisional()
+
+        private fun String.isProvisional(): Boolean = startsWith(FALLBACK_KEY_PREFIX)
 
         /** A tab's pinned identity discriminator, tied to the base it was computed for. */
         private val KEY_INDEX = Key.create<PinnedIndex>("TabCue.keyIndex")

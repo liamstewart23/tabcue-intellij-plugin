@@ -45,19 +45,16 @@ object StylePalette {
     )
 
     /**
-     * The icon a tab should actually show.
-     *
-     * Precedence is emoji, then a chosen icon, then, when [colorAsDot] is on, a dot in the tab's
-     * colour. That last fallback is what keeps a colour-only style visible: the platform's tab
-     * painter discards the tab background colour on the selected tab and blends an opaque hover
-     * colour over it on hover, whereas the icon is painted in every state.
+     * The icon the user actually picked, emoji first. Separate from [colorDot] because the two
+     * rank differently against an icon somebody else owns: a chosen icon replaces it, a dot does not.
      */
-    fun iconFor(style: TabStyle, colorAsDot: Boolean): Icon? {
+    fun chosenIcon(style: TabStyle): Icon? {
         style.emoji?.takeIf { it.isNotBlank() }?.let { return EmojiIcon(it) }
-        icon(style.iconId)?.let { return it }
-        if (colorAsDot) color(style.colorId)?.let { return DotIcon(it) }
-        return null
+        return icon(style.iconId)
     }
+
+    /** A dot in the tab's colour, which is what keeps a colour-only style visible once selected. */
+    fun colorDot(style: TabStyle): Icon? = color(style.colorId)?.let { DotIcon(it) }
 
     /**
      * Emoji offered directly in the tab menu.

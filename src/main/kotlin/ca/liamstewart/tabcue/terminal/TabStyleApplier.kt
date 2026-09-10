@@ -55,8 +55,8 @@ object TabStyleApplier {
     /** Whether we currently have a forced foreground on this tab's label. */
     private val TEXT_COLORED = Key.create<Boolean>("TabCue.textColored")
 
-    /** Whether the icon currently on this tab is one we set. */
-    private val ICON_OWNED = Key.create<Boolean>("TabCue.iconOwned")
+    /** The icon we last set, so ownership is checked against the tab. Our icons implement `equals`. */
+    private val OUR_ICON = Key.create<Icon>("TabCue.ourIcon")
 
     /** The icon somebody else had set before we replaced it, so clearing can put it back. */
     private val FOREIGN_ICON = Key.create<Icon>("TabCue.foreignIcon")
@@ -94,7 +94,9 @@ object TabStyleApplier {
             emptyList()
         }
         val target = Applied(style, colorAsDot, tintEnabled, editors.size, tintStrength)
-        if (content.getUserData(APPLIED) == target && textSettled) return
+        // The icon is checked too: the memo cannot see somebody else having replaced it.
+        val iconSettled = content.getUserData(OUR_ICON).let { it == null || it == quietly { content.icon } }
+        if (content.getUserData(APPLIED) == target && textSettled && iconSettled) return
 
         // Not the accent itself: ColorMath derives a fill that keeps the tab label legible and
         // pre-compensates for the translucent overlay the platform composites over it. Null still
@@ -137,8 +139,8 @@ object TabStyleApplier {
      * Returns false when a label colour was wanted but the label could not be found, so it retries.
      *
      * The marker is what makes clearing work: the label cannot say what colour it used to have, so
-     * the only way back is to reassign the theme's, and we have to know to do that for a style
-     * that has no colour of its own.
+     * the only way back is to reassign the theme's, and we have to know to do that for a style that
+     * has no colour of its own.
      */
     private fun applyTextColor(content: Content, style: TabStyle): Boolean {
         val wanted = StylePalette.textColor(style.textColorId)
@@ -148,39 +150,48 @@ object TabStyleApplier {
             TabLabelFacade.applyTextColor(content, wanted)
         } ?: false
 
-        if (applied) content.putUserData(TEXT_COLORED, if (wanted != null) true else null)
+        // Recorded on request rather than on success. The facade remembers the wanted colour and
+        // reapplies it whenever the label is painted, so a later clear has to reach it even if this
+        // attempt could not find the label yet.
+        content.putUserData(TEXT_COLORED, if (wanted != null) true else null)
         return applied
     }
 
     /**
      * Sets the tab icon without destroying an icon somebody else owns.
      *
-     * PhpStorm 2026.2's "AI Agents" feature marks the tabs it launches using the same two calls
-     * used here. Since every terminal tab is restyled whether or not it has a style, clearing
-     * unconditionally wiped that icon. So only icons we set are cleared, and the previous one is
-     * put back.
+     * PhpStorm 2026.2 brands AI agent tabs with a vendor logo using the same two calls used here,
+     * and every terminal tab is restyled whether or not it has a style. So an icon we did not set
+     * is put back when our style no longer needs one, and the dot, being only our stand-in for the
+     * tab colour, yields to it entirely. An emoji or a chosen icon still wins.
      */
     private fun applyIcon(content: Content, style: TabStyle, colorAsDot: Boolean) {
-        val icon = StylePalette.iconFor(style, colorAsDot)
-        val owned = content.getUserData(ICON_OWNED) == true
+        val present = quietly { content.icon }
+        val ours = content.getUserData(OUR_ICON)
+        // Anything else on the tab means ownership moved, and what is there now is what to protect.
+        val owned = ours != null && present == ours
+        val foreign = if (owned) content.getUserData(FOREIGN_ICON) else present
+
+        val icon = StylePalette.chosenIcon(style)
+            ?: StylePalette.colorDot(style).takeIf { colorAsDot && foreign == null }
 
         if (icon == null) {
-            if (!owned) return
-            val restored = content.getUserData(FOREIGN_ICON)
-            content.putUserData(ToolWindow.SHOW_CONTENT_ICON, if (restored != null) true else null)
-            content.putUserData(
-                ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT,
-                if (restored != null) false else null,
-            )
-            content.icon = restored
-            content.putUserData(ICON_OWNED, null)
+            // Never touched this tab, so there is nothing of ours to undo.
+            if (ours == null) return
+            // The icon flag has to stay on for a foreign icon, which needs it to render at all.
+            // The transparency flag is cleared either way: left at false it would keep somebody
+            // else's icon fully opaque on unselected tabs, where the platform draws it at 50%.
+            content.putUserData(ToolWindow.SHOW_CONTENT_ICON, if (foreign != null) true else null)
+            content.putUserData(ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT, null)
+            // Only while it is still ours: otherwise this would undo whatever replaced it.
+            if (owned) content.icon = foreign
+            content.putUserData(OUR_ICON, null)
             content.putUserData(FOREIGN_ICON, null)
             return
         }
 
-        // Captured before the first overwrite and only then, so a later restyle cannot mistake one
-        // of our own icons for the platform's.
-        if (!owned) content.putUserData(FOREIGN_ICON, quietly { content.icon })
+        // Recorded as ownership is taken, so a later restyle cannot mistake our icon for theirs.
+        if (!owned) content.putUserData(FOREIGN_ICON, foreign)
 
         // Order is load-bearing. The label reads both flags below while handling the icon change,
         // and writing user data fires no event, so setting the icon last is what makes it appear
@@ -189,7 +200,7 @@ object TabStyleApplier {
         // Without this, unselected tabs render the icon at 50% alpha as a WatermarkIcon.
         content.putUserData(ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT, false)
         content.icon = icon
-        content.putUserData(ICON_OWNED, true)
+        content.putUserData(OUR_ICON, icon)
     }
 
     /** Returns false when a tint was wanted but no editor could be found, so it can be retried. */
@@ -247,7 +258,7 @@ object TabStyleApplier {
         content.putUserData(TINTED, null)
         content.putUserData(SETTLE_ATTEMPTS, null)
         content.putUserData(TEXT_COLORED, null)
-        content.putUserData(ICON_OWNED, null)
+        content.putUserData(OUR_ICON, null)
         content.putUserData(FOREIGN_ICON, null)
         TabLabelFacade.forget(content)
     }

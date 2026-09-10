@@ -38,6 +38,21 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         tintStrength = TINT_STRENGTH_DEFAULT,
     )
 
+    /**
+     * The tab label colour is reasserted while the tab paints, so withdrawing it has to reach the
+     * facade even on a tab whose label was never found. Recording the request only on success left
+     * a cleared style still asking for a colour.
+     */
+    fun testWithdrawingALabelColourReachesTheFacadeWithNoLabelPresent() {
+        val content = newContent()
+        // No window ancestor in the fixture, so the label search cannot succeed here.
+        applyStyle(content, TabStyle(textColorId = "white"))
+        assertEquals(StylePalette.textColor("white"), TabLabelFacade.wantedColor(content))
+
+        applyStyle(content, TabStyle.EMPTY)
+        assertNull("a style with no text colour must withdraw the request", TabLabelFacade.wantedColor(content))
+    }
+
     fun testTabColourIsTheDerivedFillNotTheRawAccent() {
         val content = newContent()
         val accent = StylePalette.color("red")
@@ -129,6 +144,54 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         applyStyle(content, TabStyle(iconId = "run", emoji = "🚀"))
 
         assertTrue("emoji must win over the built-in icon", content.icon is EmojiIcon)
+    }
+
+    fun testTheColourDotYieldsToAnIconSomebodyElseSet() {
+        val content = newContent()
+        // PhpStorm 2026.2 brands a Codex or Junie tab with its vendor logo. The dot is only our
+        // own stand-in for the tab colour, so overwriting real information with it is a downgrade.
+        val foreign = com.intellij.icons.AllIcons.General.Information
+        content.icon = foreign
+
+        applyStyle(content, TabStyle(colorId = "red"), colorAsDot = true)
+
+        assertSame("the dot must not replace an icon we do not own", foreign, content.icon)
+        assertEquals(
+            "the colour itself still applies",
+            ColorMath.tabFill(StylePalette.color("red")!!),
+            content.tabColor,
+        )
+    }
+
+    fun testAnExplicitEmojiStillWinsOverAForeignIcon() {
+        val content = newContent()
+        val foreign = com.intellij.icons.AllIcons.General.Information
+        content.icon = foreign
+
+        applyStyle(content, TabStyle(colorId = "red", emoji = "\uD83D\uDE80"), colorAsDot = true)
+        // Unlike the dot, this was asked for by name, so it takes the tab over.
+        assertTrue("a chosen emoji must win", content.icon is EmojiIcon)
+
+        applyStyle(content, TabStyle.EMPTY, colorAsDot = true)
+        assertSame("and hand the tab back when it is cleared", foreign, content.icon)
+    }
+
+    fun testADotIsDroppedOnceSomethingElseClaimsTheIcon() {
+        val content = newContent()
+        applyStyle(content, TabStyle(colorId = "red"), colorAsDot = true)
+        assertTrue("a tab with no icon of its own gets the dot", content.icon is DotIcon)
+
+        // The IDE sets the agent logo just after creating the tab, which is just after our first
+        // restyle. The style has not changed, so the change-detection cache would otherwise skip
+        // this pass and the next one would paint the dot straight back over the logo.
+        val foreign = com.intellij.icons.AllIcons.General.Information
+        content.icon = foreign
+        applyStyle(content, TabStyle(colorId = "red"), colorAsDot = true)
+
+        assertSame("the dot must step aside", foreign, content.icon)
+        // And stay stepped aside, rather than alternating with the logo on every shell prompt.
+        applyStyle(content, TabStyle(colorId = "red"), colorAsDot = true)
+        assertSame(foreign, content.icon)
     }
 
     fun testToolwindowTitleIsNeverBlankSoTheTabStripIsNotHidden() {
@@ -244,5 +307,10 @@ class TabStyleApplierTest : BasePlatformTestCase() {
         assertNull("applied style should be forgotten", TabStyleApplier.appliedStyle(content))
         // The foreign icon is restored by the reset's own apply pass, then ownership is dropped.
         assertSame("the icon we replaced should be back", foreign, content.icon)
+        // And it goes back to rendering the way the platform would draw it on its own.
+        assertNull(content.getUserData(ToolWindowContentUi.NOT_SELECTED_TAB_ICON_TRANSPARENT))
+        assertEquals(true, content.getUserData(ToolWindow.SHOW_CONTENT_ICON))
+        // Left behind, a wanted colour would have the label listener recolour the tab after unload.
+        assertNull(TabLabelFacade.wantedColor(content))
     }
 }

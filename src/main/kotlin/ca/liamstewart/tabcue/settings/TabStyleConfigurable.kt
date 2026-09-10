@@ -2,17 +2,20 @@ package ca.liamstewart.tabcue.settings
 
 import com.intellij.openapi.options.SearchableConfigurable
 import com.intellij.openapi.project.Project
+import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.table.JBTable
+import com.intellij.util.ui.ColorIcon
 import com.intellij.util.ui.ColumnInfo
 import com.intellij.util.ui.ListTableModel
 import ca.liamstewart.tabcue.model.StylePalette
 import ca.liamstewart.tabcue.model.StyleRule
 import javax.swing.JComponent
 import javax.swing.JSlider
+import javax.swing.JTable
 
 /** Settings ▸ Tools ▸ TabCue. */
 internal class TabStyleConfigurable(private val project: Project) : SearchableConfigurable {
@@ -49,6 +52,9 @@ internal class TabStyleConfigurable(private val project: Project) : SearchableCo
     private val table = JBTable(tableModel).apply {
         setShowGrid(false)
         emptyText.text = "No rules. Tabs are styled only by hand."
+        // A column of colour names is not scannable, and it was the one place in the plugin where
+        // a colour was named without being shown.
+        columnModel.getColumn(STYLE_COLUMN).cellRenderer = StyleCellRenderer(tableModel)
     }
 
     /**
@@ -224,5 +230,24 @@ private object StyleColumn : ColumnInfo<StyleRule, String>("Style") {
         return if (parts.isEmpty()) "None" else parts.joinToString(", ")
     }
 }
+
+/** Shows the rule's tab colour beside its summary. */
+private class StyleCellRenderer(private val model: ListTableModel<StyleRule>) : ColoredTableCellRenderer() {
+    override fun customizeCellRenderer(
+        table: JTable,
+        value: Any?,
+        selected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int,
+    ) {
+        val rule = model.items.getOrNull(table.convertRowIndexToModel(row))
+        icon = StylePalette.color(rule?.style?.colorId)?.let { ColorIcon(SWATCH_SIZE, it, true) }
+        append(value as? String ?: "")
+    }
+}
+
+/** Where [StyleColumn] sits in the model below. */
+private const val STYLE_COLUMN = 3
 
 private const val ID = "ca.liamstewart.tabcue.settings"

@@ -246,6 +246,29 @@ class TabStyleServiceTest : BasePlatformTestCase() {
         )
     }
 
+    fun testAnAutoColourIsRederivedOnlyWhenTheTabIdentityFirmsUp() {
+        // A tab's first restyle runs before the terminal has reported a name or directory, so the
+        // colour would otherwise be derived from the placeholder key and follow the tab's position
+        // in the strip instead of the tab. The transition can only be driven with a live terminal,
+        // so the rule itself is pinned here.
+        assertTrue(
+            "placeholder to real identity should re-derive",
+            TabStyleService.shouldRederive("tab:Local", "cwd:/code/api"),
+        )
+        assertFalse(
+            "a shell changing directory must keep its colour",
+            TabStyleService.shouldRederive("cwd:/code/api", "cwd:/code/web"),
+        )
+        assertFalse(
+            "a title change before the directory resolves must not recolour on every prompt",
+            TabStyleService.shouldRederive("tab:Local", "tab:npm run dev"),
+        )
+        assertFalse(
+            "a resolved identity is never re-derived",
+            TabStyleService.shouldRederive("name:deploy", "tab:Local"),
+        )
+    }
+
     fun testSavedStateIsASnapshotRatherThanTheLiveOne() {
         // getState() is called on a background save thread while Apply can be replacing the rule
         // list on the EDT. Handing out the live object also let a caller mutate settings without
@@ -264,19 +287,25 @@ class TabStyleServiceTest : BasePlatformTestCase() {
         assertFalse("the service should be unaffected", settings.autoAssignColors)
     }
 
-    fun testStarterRulesArriveOnceAndStayDeleted() {
-        // The two halves of the promise: a fresh project gets the agent rules, and deleting them
-        // is permanent. Getting the second wrong would re-add them on every project open, which is
-        // the most annoying possible behaviour.
+    fun testAutoColorsSeedOnceAndStayOff() {
+        // The two halves of the promise: a fresh project gets auto colours, and switching them off
+        // is permanent. Getting the second wrong would switch them back on at every project open,
+        // which is the most annoying possible behaviour.
         val saved = settings.state
         try {
             settings.loadState(ca.liamstewart.tabcue.settings.TabStyleState())
-            assertFalse("a fresh project should get starter rules", settings.rules().isEmpty())
+            settings.noStateLoaded()
+            assertTrue("a fresh project should get auto colours", settings.autoAssignColors)
+            assertTrue("no rules should be invented", settings.rules().isEmpty())
 
             settings.loadState(
-                ca.liamstewart.tabcue.settings.TabStyleState().apply { seededStarterRules = true },
+                ca.liamstewart.tabcue.settings.TabStyleState().apply { seededDefaults = true },
             )
-            assertTrue("deleted starter rules must not come back", settings.rules().isEmpty())
+            assertFalse("auto colours must stay off once switched off", settings.autoAssignColors)
+
+            // An existing project is not a fresh install, so an upgrade must leave it alone.
+            settings.loadState(ca.liamstewart.tabcue.settings.TabStyleState())
+            assertFalse("loading a stored file must not seed anything", settings.autoAssignColors)
         } finally {
             // Restored, because the project is shared across the methods in this class.
             settings.loadState(saved)

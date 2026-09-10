@@ -11,40 +11,50 @@
          first paragraph is used on its own as the search-result summary, so it has to stand alone.
          Safe HTML subset only: p ul li b code h3. -->
     <description><![CDATA[
-        <p>Style terminal tabs with custom colours, background hints, and emojis so you can tell
-        terminals and AI agents apart at a glance.</p>
+        <p>Give every terminal tab its own colour, emoji, icon and text colour, so five open
+        terminals stop looking like one terminal.</p>
 
-        <p>I kept losing track of which terminal was which. <code>npm run dev</code>, a couple of
-        Claude sessions, and an <code>ssh</code> into something I would rather not typo in. They
-        all look identical. So each Terminal tab can now have its own colour, icon or emoji.</p>
+        <p>I kept losing track of which was which. <code>npm run dev</code>, a couple of Claude
+        sessions, and an <code>ssh</code> into something I would rather not typo in. They all look
+        identical, and the IDE numbers them "Local (2)", "Local (3)" and leaves you to remember the
+        rest.</p>
 
-        <p>Right-click any Terminal tab and choose <b>Tab Style</b>.</p>
+        <p>Right-click any Terminal tab and choose <b>Tab Style</b>. Everything is there.</p>
 
         <h3>What it does</h3>
         <ul>
-            <li><b>Colours.</b> Eight presets, or any colour at all from the IDE's own picker.
-                Shown as the tab background and as a small dot.</li>
-            <li><b>Text colour.</b> White, black or custom, for when you want a tab to stand out
-                while you are looking at it.</li>
-            <li><b>Icons and emoji.</b> A built-in icon or any emoji, from the tab menu.</li>
-            <li><b>Rules.</b> Style tabs automatically by title or working directory. Paint
-                anything matching <code>ssh prod</code> red so you always know which machine you
-                are on.</li>
+            <li><b>Colours.</b> Eight presets, or any colour at all from the IDE's own colour
+                picker, with live preview as you drag. Painted as the tab background and as a small
+                dot beside the name.</li>
+            <li><b>Emoji.</b> Twelve common ones are a single click in the tab menu, and
+                <i>Custom…</i> takes anything else, including the system emoji palette on
+                macOS.</li>
+            <li><b>Icons.</b> Ten of the IDE's own, for when an emoji is too much.</li>
+            <li><b>Text colour.</b> White, black or custom. This is the cue that stays put while a
+                tab is selected.</li>
+            <li><b>Rules.</b> Style tabs automatically by title or working directory, first match
+                wins. Paint anything matching <code>ssh prod</code> red so you always know which
+                machine you are on.</li>
             <li><b>Background tint.</b> Optionally tint the terminal output area too, not just the
-                tab.</li>
+                tab, at a strength you choose.</li>
         </ul>
 
-        <p>It works before you configure anything. A new project starts with rules for <b>Claude
-        Code, Codex, Junie and aider</b>, each with its own colour and emoji. Auto-assigned colours
-        give every other terminal a colour derived from its own name and directory, so it is the
-        same colour tomorrow.</p>
+        <p>It does something before you configure anything: each terminal is given its own colour,
+        derived from the tab's name and directory so it is still that colour tomorrow. Rules, auto
+        colours and tint strength all live in <b>Settings ▸ Tools ▸ TabCue</b>, and auto colours can
+        be switched off there if you would rather choose every one yourself.</p>
 
         <h3>Good to know</h3>
         <ul>
-            <li>The IDE throws away a tab's colour while that tab is selected. The dot, the emoji
-                and the text colour are the cues that survive in every state.</li>
+            <li>The IDE throws away a tab's background colour while that tab is selected, and paints
+                its hover colour over it on hover. The dot, the emoji and the text colour are the
+                cues that survive in every state, which is why the dot is on by default.</li>
             <li>Split terminals share one colour, because a split is several sessions inside a
                 single tab.</li>
+            <li>An AI agent tab the IDE has already marked with a vendor logo keeps it. The colour
+                still applies, and an emoji you pick yourself still replaces the logo.</li>
+            <li>Works with both the reworked and the classic terminal engine, in any
+                IntelliJ-based IDE that bundles the Terminal.</li>
             <li>Rules live in <code>.idea/terminalTabStyle.xml</code> so you can commit and share
                 them. Per-tab styles go in <code>workspace.xml</code>, because their keys contain
                 local paths. Nothing leaves your machine.</li>
