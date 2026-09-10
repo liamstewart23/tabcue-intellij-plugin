@@ -7,34 +7,49 @@
          the address and the URL to be valid and reachable. -->
     <vendor email="hello+jetbrains@liamstewart.ca" url="https://liamstewart.ca">Liam Stewart</vendor>
 
+    <!-- This is both the Marketplace page body and the text shown in Settings > Plugins. The
+         first paragraph is used on its own as the search-result summary, so it has to stand alone.
+         Safe HTML subset only: p ul li b code h3. Entities are resolved by the HTML renderer, not
+         the XML parser, which is why &mdash; inside CDATA is fine. -->
     <description><![CDATA[
         <p>Style terminal tabs with custom colours, background hints, and emojis so you can tell
         terminals and AI agents apart at a glance.</p>
 
+        <p>I kept losing track of which terminal was which &mdash; <code>npm run dev</code>, a
+        couple of Claude sessions, and an <code>ssh</code> into something I would rather not typo
+        in. They all look identical. So each Terminal tab can now have its own colour, icon or
+        emoji.</p>
+
+        <p>Right-click any Terminal tab and choose <b>Tab Style</b>.</p>
+
         <h3>What it does</h3>
         <ul>
-            <li><b>Style a tab by hand</b> &mdash; right-click any Terminal tab and pick a colour,
-                an icon, or an emoji.</li>
-            <li><b>Or let rules do it</b> &mdash; match on a tab's title or working directory and
-                have the style applied automatically. Give each agent session its own emoji so a
-                long-running agent is never mistaken for a free shell, or paint anything matching
-                <code>ssh prod</code> red so you always know which machine you are on.</li>
-            <li><b>Tint the output area</b> &mdash; optionally recolour the terminal background
-                itself, not just the tab, for sessions you really do not want to mix up.</li>
+            <li><b>Colours</b> &mdash; eight presets, or any colour at all from the IDE's own
+                picker. Shown as the tab background and as a small dot.</li>
+            <li><b>Text colour</b> &mdash; white, black or custom, for when you want a tab to stand
+                out while you are looking at it.</li>
+            <li><b>Icons and emoji</b> &mdash; a built-in icon or any emoji, from the tab menu.</li>
+            <li><b>Rules</b> &mdash; style tabs automatically by title or working directory. Paint
+                anything matching <code>ssh prod</code> red so you always know which machine you
+                are on.</li>
+            <li><b>Background tint</b> &mdash; optionally tint the terminal output area too, not
+                just the tab.</li>
         </ul>
 
-        <h3>Notes</h3>
+        <p>It works before you configure anything. A new project starts with rules for <b>Claude
+        Code, Codex, Junie and aider</b>, each with its own colour and emoji, and auto-assigned
+        colours give every other terminal a colour derived from its own name and directory &mdash;
+        so it is the same colour tomorrow.</p>
+
+        <h3>Good to know</h3>
         <ul>
-            <li>A tab's colour is also drawn as a small dot, because the IDE's tab painter replaces
-                a custom tab colour while a tab is selected or hovered. The dot stays visible in
-                every state.</li>
-            <li>Works in every IntelliJ-based IDE that bundles the Terminal &mdash; IntelliJ IDEA,
-                PhpStorm, WebStorm, PyCharm, GoLand, RubyMine and the rest &mdash; and with both
-                terminal engines. Split terminals share one tab colour, since a split is several
-                sessions in a single tab.</li>
-            <li>Rules are stored in <code>.idea/terminalTabStyle.xml</code> so they can be shared;
-                per-tab styles live in <code>workspace.xml</code> because their identifiers contain
-                local paths. Nothing is sent anywhere.</li>
+            <li>The IDE throws away a tab's colour while that tab is selected, so the dot, the
+                emoji and the text colour are the cues that survive in every state.</li>
+            <li>Split terminals share one colour &mdash; a split is several sessions inside a
+                single tab.</li>
+            <li>Rules live in <code>.idea/terminalTabStyle.xml</code> so you can commit and share
+                them. Per-tab styles go in <code>workspace.xml</code>, because their keys contain
+                local paths. Nothing leaves your machine.</li>
         </ul>
     ]]></description>
 
